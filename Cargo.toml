@@ -1,0 +1,20 @@
+[package]
+name = "jsondiffpatch_rs"
+version = "0.1.0"
+edition = "2021"
+description = "JSON diff & patch (object and array diff, text diff, multiple output formats)"
+authors = ["Benjamin Eidelman <beneidel@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/benjamine/jsondiffpatch"
+keywords = ["json", "diff", "patch"]
+categories = ["data-structures", "algorithms"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+anyhow = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"
