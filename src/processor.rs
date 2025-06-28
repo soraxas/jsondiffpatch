@@ -139,7 +139,6 @@ impl Processor {
 
             pipeline.process(context, &mut new_children_context);
 
-
             if new_children_context.is_empty() {
                 // continue to process the next queue
                 // continue;

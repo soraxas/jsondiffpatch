@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub struct CollectionChildrenDiffFilter;
 pub struct CollectionChildrenPatchFilter;
 
-impl<'a> Filter<DiffContext<'a>, Delta> for CollectionChildrenDiffFilter {
+impl<'a> Filter<DiffContext<'a>, Delta<'a>> for CollectionChildrenDiffFilter {
     fn filter_name(&self) -> &str {
         "collection-children-diff"
     }
@@ -21,10 +21,9 @@ impl<'a> Filter<DiffContext<'a>, Delta> for CollectionChildrenDiffFilter {
 
     fn post_process(
         &self,
-        context: &mut DiffContext,
-        children_context: &mut Vec<(String, DiffContext)>,
+        context: &mut DiffContext<'a>,
+        children_context: &mut Vec<(String, DiffContext<'a>)>,
     ) {
-
         // let mut context_mut = context.borrow_mut();
         // This is a simplified implementation
         // In the full implementation, this would handle trivial cases like:
@@ -33,7 +32,7 @@ impl<'a> Filter<DiffContext<'a>, Delta> for CollectionChildrenDiffFilter {
         // - Null values
         // - Primitive values
 
-        let result = if context.left.is_object() {
+        let result: Delta<'a> = if context.left.is_object() {
             let mut result = HashMap::new();
 
             for (key, child) in children_context {
@@ -68,7 +67,7 @@ impl<'a> Filter<DiffContext<'a>, Delta> for CollectionChildrenDiffFilter {
 
 pub struct ObjectsDiffFilter;
 
-impl<'a> Filter<DiffContext<'a>, Delta> for ObjectsDiffFilter {
+impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ObjectsDiffFilter {
     fn filter_name(&self) -> &str {
         "objects-diff"
     }

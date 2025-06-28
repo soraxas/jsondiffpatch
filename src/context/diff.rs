@@ -16,15 +16,15 @@ pub struct DiffContext<'a> {
 }
 
 impl<'a> FilterContext for DiffContext<'a> {
-    type Result = Delta;
+    type Result = Delta<'a>;
 
-    fn set_result(&mut self, result: Delta) -> &mut Self {
+    fn set_result(&mut self, result: Delta<'a>) -> &mut Self {
         log::trace!("set_result: {:?}", result);
         self.context.set_result(result);
         self
     }
 
-    fn get_result(&self) -> Option<&Delta> {
+    fn get_result(&self) -> Option<&Delta<'a>> {
         self.context.result.as_ref()
     }
 
@@ -52,7 +52,7 @@ impl<'a> DiffContext<'a> {
         }
     }
 
-    pub fn prepare_delta_result<T: Into<Delta>>(&mut self, result: T) -> Delta {
+    pub fn prepare_delta_result<T: Into<Delta<'a>>>(&mut self, result: T) -> Delta<'a> {
         let mut delta = result.into();
 
         // Handle omit_removed_values option
@@ -76,7 +76,7 @@ impl<'a> DiffContext<'a> {
         delta
     }
 
-    fn clone_delta_values(&self, delta: Delta) -> Delta {
+    fn clone_delta_values(&self, delta: Delta<'a>) -> Delta<'a> {
         todo!()
         // match delta {
         //     Delta::Added(value) => {
@@ -111,7 +111,7 @@ impl<'a> DiffContext<'a> {
         // }
     }
 
-    pub fn get_result(&self) -> Option<&Delta> {
+    pub fn get_result(&self) -> Option<&Delta<'a>> {
         self.context.result.as_ref()
     }
 

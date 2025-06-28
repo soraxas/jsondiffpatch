@@ -18,7 +18,7 @@ pub fn create(options: Option<Options>) -> DiffPatcher {
     DiffPatcher::new(options)
 }
 
-pub fn diff(left: &serde_json::Value, right: &serde_json::Value) -> Option<Delta> {
+pub fn diff<'a>(left: &'a serde_json::Value, right: &'a serde_json::Value) -> Option<Delta<'a>> {
     let instance = DEFAULT_INSTANCE.get_or_init(|| DiffPatcher::new(None));
     instance.diff(left, right)
 }
@@ -33,7 +33,7 @@ pub fn unpatch(right: &serde_json::Value, delta: &Delta) -> Option<serde_json::V
     instance.unpatch(right, delta)
 }
 
-pub fn reverse(delta: &Delta) -> Option<Delta> {
+pub fn reverse<'a>(delta: &Delta<'a>) -> Option<Delta<'a>> {
     let instance = DEFAULT_INSTANCE.get_or_init(|| DiffPatcher::new(None));
     instance.reverse(delta)
 }

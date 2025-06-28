@@ -4,7 +4,7 @@ use crate::types::Delta;
 
 pub struct TrivialDiffFilter;
 
-impl<'a> Filter<DiffContext<'a>, Delta> for TrivialDiffFilter {
+impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TrivialDiffFilter {
     fn filter_name(&self) -> &str {
         "trivial-diff"
     }
@@ -22,25 +22,22 @@ impl<'a> Filter<DiffContext<'a>, Delta> for TrivialDiffFilter {
         // - Primitive values
 
         // let mut context_mut = context.borrow_mut();
-        let left = context.left.clone();
-        let right = context.right.clone();
+        let left = context.left;
+        let right = context.right;
 
         if left == right {
             context.set_result(Delta::None).exit();
-            return;
-        }
-
-        if left.is_null() {
+        } else if left.is_null() {
             context.set_result(Delta::Added(right)).exit();
-            return;
-        }
-        if right.is_null() {
+        } else if right.is_null() {
             context.set_result(Delta::Deleted(left)).exit();
-            return;
-        }
-        if std::mem::discriminant(&left) != std::mem::discriminant(&right) {
+        } else if left.is_boolean()
+            || left.is_number()
+            || (std::mem::discriminant(left) != std::mem::discriminant(right))
+        {
             context.set_result(Delta::Modified(left, right)).exit();
         }
+
         // if context.left.is_object() {
         //     context.set_result(Delta::Object(context.left.clone())).exit();
         // }

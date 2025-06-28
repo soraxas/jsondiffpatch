@@ -53,27 +53,29 @@ pub enum ArrayDeltaIndex {
 }
 
 #[derive(Debug, Clone)]
-pub enum Delta {
-    Added(Value),
-    Modified(Value, Value),
-    Deleted(Value),
-    Object(HashMap<String, Delta>),
-    Array(Vec<(ArrayDeltaIndex, Delta)>),
+pub enum Delta<'a> {
+    Added(&'a Value),
+    Modified(&'a Value, &'a Value),
+    Deleted(&'a Value),
+    Object(HashMap<String, Delta<'a>>),
+    Array(Vec<(ArrayDeltaIndex, Delta<'a>)>),
     Moved {
-        moved_value: Option<Value>,
+        moved_value: Option<&'a Value>,
         new_index: usize,
     },
     TextDiff(String),
     None,
 }
 
-impl Delta {
+impl<'a> Delta<'a> {
     pub fn to_serializable(self) -> Value {
         match self {
-            Delta::Added(new_value) => Value::Array(vec![new_value]),
-            Delta::Modified(old_value, new_value) => Value::Array(vec![old_value, new_value]),
+            Delta::Added(new_value) => Value::Array(vec![new_value.clone()]),
+            Delta::Modified(old_value, new_value) => {
+                Value::Array(vec![old_value.clone(), new_value.clone()])
+            }
             Delta::Deleted(deleted) => {
-                Value::Array(vec![deleted, 0.into(), MAGIC_NUMBER_DELETED.into()])
+                Value::Array(vec![deleted.clone(), 0.into(), MAGIC_NUMBER_DELETED.into()])
             }
             Delta::Object(value) => Value::Object(
                 value
@@ -102,7 +104,7 @@ impl Delta {
                 moved_value,
                 new_index,
             } => Value::Array(vec![
-                moved_value.unwrap_or("".into()),
+                moved_value.unwrap_or(&Value::Null).clone(),
                 new_index.into(),
                 MAGIC_NUMBER_ARRAY_MOVED.into(),
             ]),
@@ -147,36 +149,37 @@ impl Default for Options {
 
 #[test]
 fn test_my_delta_to_serializable() {
+    let added = "added".into();
+    let old = "old".into();
+    let new = "new".into();
+    let deleted = "deleted".into();
+    let moved = "moved".into();
+    let text_diff = "text_diff";
+
     let delta = Delta::Object(HashMap::from([
-        ("a".to_string(), (Delta::Added("added".into()))),
-        (
-            "b".to_string(),
-            (Delta::Modified("old".into(), "new".into())),
-        ),
-        ("c".to_string(), (Delta::Deleted("deleted".into()))),
+        ("a".to_string(), (Delta::Added(&added))),
+        ("b".to_string(), (Delta::Modified(&old, &new))),
+        ("c".to_string(), (Delta::Deleted(&deleted))),
         (
             "d".to_string(),
             (Delta::Moved {
-                moved_value: Some("moved".into()),
+                moved_value: Some(&moved),
                 new_index: 1,
             }),
         ),
-        ("e".to_string(), (Delta::TextDiff("text_diff".into()))),
+        ("e".to_string(), (Delta::TextDiff(text_diff.to_string()))),
         (
             "f".to_string(),
             (Delta::Array(vec![
-                (
-                    ArrayDeltaIndex::NewOrModified(5),
-                    (Delta::Added("added".into())),
-                ),
+                (ArrayDeltaIndex::NewOrModified(5), (Delta::Added(&added))),
                 (
                     ArrayDeltaIndex::RemovedOrMoved(7),
-                    (Delta::Deleted("deleted".into())),
+                    (Delta::Deleted(&deleted)),
                 ),
                 (
                     ArrayDeltaIndex::RemovedOrMoved(8),
                     (Delta::Moved {
-                        moved_value: Some("moved".into()),
+                        moved_value: Some(&moved),
                         new_index: 1,
                     }),
                 ),
@@ -185,20 +188,17 @@ fn test_my_delta_to_serializable() {
         (
             "g".to_string(),
             (Delta::Object(HashMap::from([
-                ("h".to_string(), (Delta::Added("added".into()))),
-                (
-                    "i".to_string(),
-                    (Delta::Modified("old".into(), "new".into())),
-                ),
-                ("j".to_string(), (Delta::Deleted("deleted".into()))),
+                ("h".to_string(), (Delta::Added(&added))),
+                ("i".to_string(), (Delta::Modified(&old, &new))),
+                ("j".to_string(), (Delta::Deleted(&deleted))),
                 (
                     "k".to_string(),
                     (Delta::Moved {
-                        moved_value: Some("moved".into()),
+                        moved_value: Some(&moved),
                         new_index: 1,
                     }),
                 ),
-                ("l".to_string(), (Delta::TextDiff("text_diff".into()))),
+                ("l".to_string(), (Delta::TextDiff(text_diff.to_string()))),
             ]))),
         ),
     ]));
