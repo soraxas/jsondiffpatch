@@ -1,126 +1,165 @@
-use crate::context::{ContextOld, DiffContext};
-use crate::processor::FilterOld;
+use crate::context::{ContextOld, DiffContext, FilterContext};
+use crate::processor::{Filter, FilterOld};
+use crate::types::{Delta, Options, TextDiffOptions};
+use diff_match_patch_rs::{DiffMatchPatch, Efficient, Error, PatchInput};
+use regex::Regex;
 use serde_json::Value;
 
-pub struct TextsDiffFilter;
-pub struct TextsPatchFilter;
+const TEXT_DIFF: u32 = 2;
+const DEFAULT_MIN_LENGTH: usize = 60;
 
-// impl Filter<DiffContext, Delta> for TextsPatchFilter {
-//     fn filter_name(&self) -> &str {
-//         "texts-diff"
-//     }
+// static CACHED_DMP: OnceLock<Dmp> = OnceLock::new();
 
-//     fn process(&self, context: &mut DiffContext) {
-//         // This is a simplified implementation
-//         // In the full implementation, this would handle trivial cases like:
-//         // - Same values (no diff)
-//         // - Different types
-//         // - Null values
-//         // - Primitive values
-
-//         if context.left == context.right {
-//             context.set_result(Delta::None).exit();
-//             return;
-//         }
-
-//         if context.left.is_null() {
-//             context.set_result(Delta::Added(context.right.clone())).exit();
-//             return;
-//         }
-//         if context.right.is_null() {
-//             context.set_result(Delta::Deleted(context.left.clone())).exit();
-//             return;
-//         }
-//         if std::mem::discriminant(&context.left) != std::mem::discriminant(&context.right) {
-//             context.set_result(Delta::Modified(context.left.clone(), context.right.clone())).exit();
-//             return;
-//         }
-//         // if context.left.is_object() {
-//         //     context.set_result(Delta::Object(context.left.clone())).exit();
-//         // }
-
-//         // For now, we'll just set a placeholder result
-//         // context.set_result(Value::Null);
-//     }
+// fn get_diff_match_patch(options: &Options) -> Option<&'static Dmp> {
+//     // For now, we'll always use the default DMP instance
+//     // In the future, this could be configurable through options
+//     CACHED_DMP.get_or_init(|| Dmp::new())
 // }
 
-impl FilterOld for TextsDiffFilter {
+// fn text_delta_reverse(delta: &str) -> String {
+//     let header_regex = regex::Regex::new(r"^@@ +-(\d+),(\d+) +\+(\d+),(\d+) +@@$").unwrap();
+//     let mut lines: Vec<&str> = delta.split('\n').collect();
+
+//     for i in 0..lines.len() {
+//         let line = lines[i];
+//         if line.is_empty() {
+//             continue;
+//         }
+
+//         let line_start = line.chars().next().unwrap_or(' ');
+
+//         if line_start == '@' {
+//             if let Some(captures) = header_regex.captures(line) {
+//                 // Fix header by swapping the numbers
+//                 let new_header = format!(
+//                     "@@ -{},{} +{},{} @@",
+//                     captures.get(3).unwrap().as_str(),
+//                     captures.get(4).unwrap().as_str(),
+//                     captures.get(1).unwrap().as_str(),
+//                     captures.get(2).unwrap().as_str()
+//                 );
+//                 lines[i] = &new_header;
+//             }
+//         } else if line_start == '+' {
+//             // Convert + to -
+//             lines[i] = &format!("-{}", &line[1..]);
+
+//             // Swap lines to keep default order (-+)
+//             if i > 0 && lines[i - 1].starts_with('+') {
+//                 lines.swap(i, i - 1);
+//             }
+//         } else if line_start == '-' {
+//             // Convert - to +
+//             lines[i] = &format!("+{}", &line[1..]);
+//         }
+//     }
+
+//     lines.join("\n")
+// }
+
+pub struct TextsDiffFilter;
+
+impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TextsDiffFilter {
     fn filter_name(&self) -> &str {
         "texts-diff"
     }
 
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Handle text diffing
-        // This would implement:
-        // - String comparison
-        // - Text diff algorithms
-        // - Character-level changes
-
-        let context: DiffContext = todo!();
-
-        // let context = context.as_any().downcast_mut::<DiffContext>().unwrap();
-
-        if !context.left.is_string() {
+    fn process(
+        &self,
+        context: &mut DiffContext<'a>,
+        _new_children_context: &mut Vec<(String, DiffContext<'a>)>,
+    ) {
+        // Check if both values are strings
+        if !context.left.is_string() || !context.right.is_string() {
             return;
         }
 
         let left = context.left.as_str().unwrap();
         let right = context.right.as_str().unwrap();
+
+        // Get minimum length from options or use default
         let min_length = context
             .options
             .text_diff
             .as_ref()
-            .unwrap()
-            .min_length
-            .unwrap_or(10);
+            .and_then(|td| td.min_length)
+            .unwrap_or(DEFAULT_MIN_LENGTH);
 
+        // If strings are too short, use regular string replace
         if left.len() < min_length || right.len() < min_length {
-            // context.set_result(vec![left, right]);
+            context
+                .set_result(Delta::Modified(context.left, context.right))
+                .exit();
+            return;
         }
 
-        // // return if right is not a string or not a some value
-        // if !context.right.is_string() {
-        //     return;
-        // }
-        // let left = context.left.as_str().unwrap();
-        // let right = context.right.as_str().unwrap();
+        // Try to use text-diff algorithm
+        let dmp = DiffMatchPatch::new();
 
-        // context.set_result(Value::Null);
+        let diffs = dmp.diff_main::<Efficient>(left, right).unwrap();
+        // Now, we are going to create a list of `patches` to be applied to the old text to get the new text
+        let patches = dmp.patch_make(PatchInput::new_diffs(&diffs)).unwrap();
+        // in the real world you are going to transmit or store this diff serialized to undiff format to be consumed or used somewhere elese
+        let patch_txt = dmp.patch_to_text(&patches);
+
+        context.set_result(Delta::TextDiff(patch_txt)).exit();
+    }
+
+    fn post_process(
+        &self,
+        _context: &mut DiffContext<'a>,
+        _children_context: &mut Vec<(String, DiffContext<'a>)>,
+    ) {
+        // No post-processing needed for text diff
     }
 }
 
-impl FilterOld for TextsPatchFilter {
+pub struct TextsPatchFilter;
+
+impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TextsPatchFilter {
     fn filter_name(&self) -> &str {
         "texts-patch"
     }
 
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Handle text patching
-        // This would apply text deltas to reconstruct the target text
+    fn process(
+        &self,
+        context: &mut DiffContext<'a>,
+        _new_children_context: &mut Vec<(String, DiffContext<'a>)>,
+    ) {
+        // This filter is for patching, not diffing
+        // The actual patch logic would be in a separate PatchContext
+    }
 
-        context.set_result(Value::Null);
+    fn post_process(
+        &self,
+        _context: &mut DiffContext<'a>,
+        _children_context: &mut Vec<(String, DiffContext<'a>)>,
+    ) {
+        // No post-processing needed
     }
 }
 
 pub struct TextsReverseFilter;
 
-impl FilterOld for TextsReverseFilter {
+impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TextsReverseFilter {
     fn filter_name(&self) -> &str {
         "texts-reverse"
     }
 
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Handle text reverse operations
-        // This would reverse text delta operations
-
-        context.set_result(Value::Null);
+    fn process(
+        &self,
+        context: &mut DiffContext<'a>,
+        _new_children_context: &mut Vec<(String, DiffContext<'a>)>,
+    ) {
+        // This filter is for reversing, not diffing
+        // The actual reverse logic would be in a separate ReverseContext
     }
-}
 
-pub fn create_texts_filters() -> Vec<Box<dyn FilterOld>> {
-    vec![
-        Box::new(TextsDiffFilter),
-        Box::new(TextsPatchFilter),
-        Box::new(TextsReverseFilter),
-    ]
+    fn post_process(
+        &self,
+        _context: &mut DiffContext<'a>,
+        _children_context: &mut Vec<(String, DiffContext<'a>)>,
+    ) {
+        // No post-processing needed
+    }
 }

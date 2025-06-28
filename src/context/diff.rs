@@ -19,6 +19,9 @@ impl<'a> FilterContext for DiffContext<'a> {
     type Result = Delta<'a>;
 
     fn set_result(&mut self, result: Delta<'a>) -> &mut Self {
+        if let Delta::None = result {
+            return self;
+        }
         log::trace!("set_result: {:?}", result);
         self.context.set_result(result);
         self

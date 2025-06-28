@@ -45,6 +45,8 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for CollectionChildrenDiffFilter {
             }
             Delta::Object(result)
         } else if context.left.is_array() {
+            return;
+
             let result = Vec::new();
 
             for (key, child) in children_context {

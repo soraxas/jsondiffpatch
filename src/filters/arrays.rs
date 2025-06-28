@@ -241,6 +241,9 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ArraysDiffFilter {
         context: &mut DiffContext<'a>,
         children_context: &mut Vec<(String, DiffContext<'a>)>,
     ) {
+        if !context.left.is_array() {
+            return;
+        }
         // Handle post-processing of array diff results
         // This would collect results from child contexts and merge them
         if children_context.is_empty() {

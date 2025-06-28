@@ -2,6 +2,7 @@ use crate::clone::clone;
 use crate::context::DiffContext;
 use crate::filters::arrays::ArraysDiffFilter;
 use crate::filters::nested::{CollectionChildrenDiffFilter, ObjectsDiffFilter};
+use crate::filters::texts::TextsDiffFilter;
 use crate::filters::TrivialDiffFilter;
 use crate::processor::{Pipe, Processor};
 use crate::types::{Delta, Options};
@@ -69,6 +70,7 @@ impl DiffPatcher {
             // .append(Box::new(CollectionChildrenDiffFilter))
             .append(Box::new(CollectionChildrenDiffFilter))
             .append(Box::new(TrivialDiffFilter))
+            .append(Box::new(TextsDiffFilter))
             .append(Box::new(ObjectsDiffFilter))
             .append(Box::new(ArraysDiffFilter))
             // .append(Box::new(CollectionChildrenReverseFilter))
@@ -83,7 +85,10 @@ impl DiffPatcher {
         let processor = Processor::new(None);
         processor.process(&mut context, &mut diff_pipe);
 
-        dbg!(&context.get_result());
+        let res = context.get_result().unwrap().clone();
+        dbg!(&res);
+
+        println!(">> {}", &res.to_serializable().to_string());
 
         // For now, return None as the implementation is simplified
         // In a full implementation, this would process the context through the pipeline
