@@ -1,10 +1,5 @@
-use crate::context::{ContextOld, FilterContext};
+use crate::context::FilterContext;
 use crate::types::Options;
-
-pub trait FilterOld: Send + Sync {
-    fn filter_name(&self) -> &str;
-    fn process(&self, context: &mut Box<dyn ContextOld>);
-}
 
 pub trait Filter<C, TResult> {
     fn filter_name(&self) -> &str;

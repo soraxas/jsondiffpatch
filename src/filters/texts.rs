@@ -1,11 +1,8 @@
-use crate::context::{ContextOld, DiffContext, FilterContext};
-use crate::processor::{Filter, FilterOld};
-use crate::types::{Delta, Options, TextDiffOptions};
-use diff_match_patch_rs::{DiffMatchPatch, Efficient, Error, PatchInput};
-use regex::Regex;
-use serde_json::Value;
+use crate::context::{DiffContext, FilterContext};
+use crate::processor::Filter;
+use crate::types::Delta;
+use diff_match_patch_rs::{DiffMatchPatch, Efficient, PatchInput};
 
-const TEXT_DIFF: u32 = 2;
 const DEFAULT_MIN_LENGTH: usize = 60;
 
 // static CACHED_DMP: OnceLock<Dmp> = OnceLock::new();

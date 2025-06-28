@@ -1,18 +1,17 @@
 use crate::context::{
+    ContextData,
     // Context,
     FilterContext,
-    MyContext,
 };
 use crate::types::{Delta, Options};
 use serde_json::Value;
 
 #[derive(Debug)]
 pub struct DiffContext<'a> {
-    pub context: MyContext<Self>,
+    context_data: ContextData<Self>,
     pub left: &'a Value,
     pub right: &'a Value,
     pub options: Options,
-    // pub has_result: bool,
 }
 
 impl<'a> FilterContext for DiffContext<'a> {
@@ -23,34 +22,34 @@ impl<'a> FilterContext for DiffContext<'a> {
             return self;
         }
         log::trace!("set_result: {:?}", result);
-        self.context.set_result(result);
+        self.context_data.set_result(result);
         self
     }
 
     fn get_result(&self) -> Option<&Delta<'a>> {
-        self.context.result.as_ref()
+        self.context_data.result.as_ref()
     }
 
     fn exit(&mut self) -> &mut Self {
-        self.context.exit();
+        self.context_data.exit();
         self
     }
 
     fn is_exiting(&self) -> bool {
-        self.context.is_exiting()
+        self.context_data.is_exiting()
     }
 
-    fn inner_data(&mut self) -> &mut MyContext<Self> {
-        &mut self.context
+    fn inner_data(&mut self) -> &mut ContextData<Self> {
+        &mut self.context_data
     }
 }
 
 impl<'a> DiffContext<'a> {
     pub fn new(left: &'a Value, right: &'a Value) -> Self {
         Self {
-            context: MyContext::new("diff".to_string()),
             left,
             right,
+            context_data: ContextData::new(),
             options: Options::default(),
         }
     }
@@ -115,7 +114,7 @@ impl<'a> DiffContext<'a> {
     }
 
     pub fn get_result(&self) -> Option<&Delta<'a>> {
-        self.context.result.as_ref()
+        self.context_data.result.as_ref()
     }
 
     pub fn has_result(&self) -> bool {

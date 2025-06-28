@@ -1,11 +1,7 @@
-use crate::context::{ContextOld, DiffContext, FilterContext};
+use crate::context::{DiffContext, FilterContext};
 use crate::lcs;
-use crate::processor::{Filter, FilterOld};
+use crate::processor::Filter;
 use crate::types::{ArrayDeltaIndex, ArrayOptions, Delta};
-use serde_json::Value;
-use std::collections::HashMap;
-
-const ARRAY_MOVE: u32 = 3;
 
 pub struct ArraysDiffFilter;
 
@@ -270,61 +266,3 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ArraysDiffFilter {
 }
 
 pub struct ArraysPatchFilter;
-
-impl FilterOld for ArraysPatchFilter {
-    fn filter_name(&self) -> &str {
-        "arrays-patch"
-    }
-
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Handle array patching
-        // This would apply array deltas to reconstruct the target array
-
-        context.set_result(Value::Null);
-    }
-}
-
-pub struct ArraysReverseFilter;
-
-impl FilterOld for ArraysReverseFilter {
-    fn filter_name(&self) -> &str {
-        "arrays-reverse"
-    }
-
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Handle array reverse operations
-        // This would reverse array delta operations
-
-        context.set_result(Value::Null);
-    }
-}
-
-pub struct CollectChildrenArraysPatchFilter;
-
-impl FilterOld for CollectChildrenArraysPatchFilter {
-    fn filter_name(&self) -> &str {
-        "collect-children-arrays-patch"
-    }
-
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Collect children for array patch operations
-        // This would prepare child contexts for array patching
-
-        context.set_result(Value::Null);
-    }
-}
-
-pub struct CollectChildrenArraysReverseFilter;
-
-impl FilterOld for CollectChildrenArraysReverseFilter {
-    fn filter_name(&self) -> &str {
-        "collect-children-arrays-reverse"
-    }
-
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Collect children for array reverse operations
-        // This would prepare child contexts for array reversing
-
-        context.set_result(Value::Null);
-    }
-}

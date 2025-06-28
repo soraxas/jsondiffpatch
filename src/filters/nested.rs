@@ -1,5 +1,5 @@
-use crate::context::{ContextOld, DiffContext, FilterContext};
-use crate::processor::{Filter, FilterOld};
+use crate::context::{DiffContext, FilterContext};
+use crate::processor::Filter;
 use crate::types::Delta;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -115,33 +115,5 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ObjectsDiffFilter {
         context: &mut DiffContext,
         new_children_context: &mut Vec<(String, DiffContext)>,
     ) {
-    }
-}
-
-impl FilterOld for CollectionChildrenPatchFilter {
-    fn filter_name(&self) -> &str {
-        "texts-patch"
-    }
-
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Handle text patching
-        // This would apply text deltas to reconstruct the target text
-
-        context.set_result(Value::Null);
-    }
-}
-
-pub struct CollectionChildrenReverseFilter;
-
-impl FilterOld for CollectionChildrenReverseFilter {
-    fn filter_name(&self) -> &str {
-        "texts-reverse"
-    }
-
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Handle text reverse operations
-        // This would reverse text delta operations
-
-        context.set_result(Value::Null);
     }
 }

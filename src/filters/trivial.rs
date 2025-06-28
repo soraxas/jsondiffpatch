@@ -1,5 +1,5 @@
-use crate::context::{ContextOld, DiffContext, FilterContext};
-use crate::processor::{Filter, FilterOld};
+use crate::context::{DiffContext, FilterContext};
+use crate::processor::Filter;
 use crate::types::Delta;
 
 pub struct TrivialDiffFilter;
@@ -58,23 +58,3 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TrivialDiffFilter {
         // - Deleted deltas
     }
 }
-
-pub struct TrivialPatchFilter;
-
-impl FilterOld for TrivialPatchFilter {
-    fn filter_name(&self) -> &str {
-        "trivial-patch"
-    }
-
-    fn process(&self, context: &mut Box<dyn ContextOld>) {
-        // Handle trivial patch operations
-        // This would handle cases like:
-        // - Added deltas
-        // - Modified deltas
-        // - Deleted deltas
-
-        // context.set_result(Value::Null).exit();
-    }
-}
-
-pub struct TrivialReverseFilter;

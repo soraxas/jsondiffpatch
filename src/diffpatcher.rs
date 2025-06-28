@@ -8,22 +8,22 @@ use crate::processor::{Pipe, Processor};
 use crate::types::{Delta, Options};
 use serde_json::Value;
 
+pub fn build_diff_pipe<'a>() -> Pipe<DiffContext<'a>, Delta<'a>> {
+    Pipe::new("diff".to_string())
+        .append(Box::new(CollectionChildrenDiffFilter))
+        .append(Box::new(TrivialDiffFilter))
+        .append(Box::new(TextsDiffFilter))
+        .append(Box::new(ObjectsDiffFilter))
+        .append(Box::new(ArraysDiffFilter))
+        .should_have_result()
+}
 pub struct DiffPatcher {
     // processor: Processor,
 }
 
 impl DiffPatcher {
     pub fn new(options: Option<Options>) -> Self {
-        // let mut processor = Processor::new(options);
 
-        // // Set up diff pipe
-        // let diff_pipe = Pipe::new("diff".to_string())
-        //     .append(create_trivial_filters())
-        //     .append(create_dates_filters())
-        //     .append(create_texts_filters())
-        //     .append(create_objects_filters())
-        //     .append(create_arrays_filters())
-        //     .should_have_result();
 
         // // Set up patch pipe
         // let patch_pipe = Pipe::new("patch".to_string())
@@ -46,7 +46,7 @@ impl DiffPatcher {
         // processor.pipe("reverse", Box::new(reverse_pipe));
 
         Self {
-            // processor
+            // diff_pipe: diff_pipe,
         }
     }
 
@@ -60,39 +60,19 @@ impl DiffPatcher {
         // self.processor.set_options(options);
     }
 
-    pub fn diff(&self, left: &Value, right: &Value) -> Option<Delta> {
+    pub fn diff<'a>(&self, left: &'a Value, right: &'a Value) -> Option<Delta<'a>> {
         // Create a diff context
         let mut context = DiffContext::new(left, right);
-
-        // panic!("test");
-
-        let mut diff_pipe = Pipe::new("diff".to_string())
-            // .append(Box::new(CollectionChildrenDiffFilter))
-            .append(Box::new(CollectionChildrenDiffFilter))
-            .append(Box::new(TrivialDiffFilter))
-            .append(Box::new(TextsDiffFilter))
-            .append(Box::new(ObjectsDiffFilter))
-            .append(Box::new(ArraysDiffFilter))
-            // .append(Box::new(CollectionChildrenReverseFilter))
-            // .append(create_dates_filters())
-            // .append(create_texts_filters())
-            // .append(create_objects_filters())
-            // .append(create_arrays_filters())
-            .should_have_result();
-
-        // diff_pipe.process(&mut context);
+        let mut diff_pipe = build_diff_pipe();
 
         let processor = Processor::new(None);
         processor.process(&mut context, &mut diff_pipe);
 
-        let res = context.get_result().unwrap().clone();
-        dbg!(&res);
+        // if let Some(res) = context.get_result() {
+        //     println!(">> {}", res.clone().to_serializable().to_string());
+        // }
 
-        println!(">> {}", &res.to_serializable().to_string());
-
-        // For now, return None as the implementation is simplified
-        // In a full implementation, this would process the context through the pipeline
-        None
+        context.get_result().cloned()
     }
 
     pub fn patch(&self, _left: &Value, _delta: &Delta) -> Option<Value> {
