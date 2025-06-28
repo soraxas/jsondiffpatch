@@ -1,37 +1,8 @@
 use serde_json::Value;
 
 pub fn clone(value: &Value) -> Value {
-    match value {
-        Value::Null => Value::Null,
-        Value::Bool(b) => Value::Bool(*b),
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                Value::Number(serde_json::Number::from(i))
-            } else if let Some(f) = n.as_f64() {
-                // Note: This is a simplified approach. In practice, you'd want to handle
-                // floating point precision more carefully
-                if let Some(n) = serde_json::Number::from_f64(f) {
-                    Value::Number(n)
-                } else {
-                    Value::Null
-                }
-            } else {
-                Value::Null
-            }
-        }
-        Value::String(s) => Value::String(s.clone()),
-        Value::Array(arr) => {
-            let cloned_arr: Vec<Value> = arr.iter().map(clone).collect();
-            Value::Array(cloned_arr)
-        }
-        Value::Object(obj) => {
-            let cloned_obj: serde_json::Map<String, Value> = obj
-                .iter()
-                .map(|(k, v)| (k.clone(), clone(v)))
-                .collect();
-            Value::Object(cloned_obj)
-        }
-    }
+    // Use serde_json's built-in clone functionality
+    value.clone()
 }
 
 #[cfg(test)]
@@ -84,8 +55,10 @@ mod tests {
     #[test]
     fn test_clone_nested() {
         let value = json!({
-            "array": [1, 2, {"nested": true}],
-            "object": {"key": "value"}
+            "nested": {
+                "array": [1, 2, {"object": true}],
+                "string": "hello"
+            }
         });
         let cloned = clone(&value);
         assert_eq!(cloned, value);

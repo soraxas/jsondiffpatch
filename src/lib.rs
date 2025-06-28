@@ -1,13 +1,13 @@
-pub mod types;
+pub mod clone;
 pub mod context;
-pub mod processor;
+pub mod date_reviver;
 pub mod diffpatcher;
 pub mod filters;
-pub mod clone;
-pub mod date_reviver;
+pub mod processor;
+pub mod types;
 
-pub use diffpatcher::DiffPatcher;
 pub use date_reviver::date_reviver;
+pub use diffpatcher::DiffPatcher;
 pub use types::{Delta, Options};
 
 use std::sync::OnceLock;

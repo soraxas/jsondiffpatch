@@ -1,15 +1,19 @@
-use crate::context::Context;
-use crate::processor::Filter;
-use serde_json::Value;
+use crate::context::{ContextOld, DiffContext, FilterContext};
+use crate::processor::{Filter, FilterOld};
+use crate::types::Delta;
 
 pub struct TrivialDiffFilter;
 
-impl Filter for TrivialDiffFilter {
+impl<'a> Filter<DiffContext<'a>, Delta> for TrivialDiffFilter {
     fn filter_name(&self) -> &str {
         "trivial-diff"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(
+        &self,
+        context: &mut DiffContext<'a>,
+        new_children_context: &mut Vec<(String, DiffContext<'a>)>,
+    ) {
         // This is a simplified implementation
         // In the full implementation, this would handle trivial cases like:
         // - Same values (no diff)
@@ -17,48 +21,63 @@ impl Filter for TrivialDiffFilter {
         // - Null values
         // - Primitive values
 
+        // let mut context_mut = context.borrow_mut();
+        let left = context.left.clone();
+        let right = context.right.clone();
+
+        if left == right {
+            context.set_result(Delta::None).exit();
+            return;
+        }
+
+        if left.is_null() {
+            context.set_result(Delta::Added(right)).exit();
+            return;
+        }
+        if right.is_null() {
+            context.set_result(Delta::Deleted(left)).exit();
+            return;
+        }
+        if std::mem::discriminant(&left) != std::mem::discriminant(&right) {
+            context.set_result(Delta::Modified(left, right)).exit();
+        }
+        // if context.left.is_object() {
+        //     context.set_result(Delta::Object(context.left.clone())).exit();
+        // }
+
         // For now, we'll just set a placeholder result
-        context.set_result(Value::Null);
+        // context.set_result(Value::Null);
+    }
+
+    fn post_process(
+        &self,
+        context: &mut DiffContext<'a>,
+        new_children_context: &mut Vec<(String, DiffContext<'a>)>,
+    ) {
+        // Handle trivial post-process operations
+        // This would handle cases like:
+        // - Added deltas
+        // - Modified deltas
+        // - Deleted deltas
     }
 }
 
 pub struct TrivialPatchFilter;
 
-impl Filter for TrivialPatchFilter {
+impl FilterOld for TrivialPatchFilter {
     fn filter_name(&self) -> &str {
         "trivial-patch"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Handle trivial patch operations
         // This would handle cases like:
         // - Added deltas
         // - Modified deltas
         // - Deleted deltas
 
-        context.set_result(Value::Null);
+        // context.set_result(Value::Null).exit();
     }
 }
 
 pub struct TrivialReverseFilter;
-
-impl Filter for TrivialReverseFilter {
-    fn filter_name(&self) -> &str {
-        "trivial-reverse"
-    }
-
-    fn process(&self, context: &mut Box<dyn Context>) {
-        // Handle trivial reverse operations
-        // This would reverse the delta operations
-
-        context.set_result(Value::Null);
-    }
-}
-
-pub fn create_trivial_filters() -> Vec<Box<dyn Filter>> {
-    vec![
-        Box::new(TrivialDiffFilter),
-        Box::new(TrivialPatchFilter),
-        Box::new(TrivialReverseFilter),
-    ]
-}

@@ -1,22 +1,34 @@
-use jsondiffpatch_rs::{create, diff, patch, unpatch, reverse, clone};
+use jsondiffpatch_rs::{clone, diff};
 use serde_json::json;
 
 fn main() {
+    env_logger::init();
+
     println!("JSON Diff Patch Rust - Demo");
     println!("===========================");
 
     // Example 1: Simple object diff
-    let left = json!({
-        "name": "John",
-        "age": 30,
-        "city": "New York"
-    });
+    let left = if std::env::args().len() > 2 {
+        let file = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
+        serde_json::from_str(&file).unwrap()
+    } else {
+        json!({
+            "name": "John",
+            "age": 30,
+            "city": "New York"
+        })
+    };
 
-    let right = json!({
-        "name": "John",
-        "age": 31,
-        "city": "Boston"
-    });
+    let right = if std::env::args().len() > 2 {
+        let file = std::fs::read_to_string(std::env::args().nth(2).unwrap()).unwrap();
+        serde_json::from_str(&file).unwrap()
+    } else {
+        json!({
+            "name": "John",
+            "age": 31,
+            "city": "Boston"
+        })
+    };
 
     println!("\nExample 1: Object diff");
     println!("Left:  {}", left);

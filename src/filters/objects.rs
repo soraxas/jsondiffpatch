@@ -1,15 +1,15 @@
-use crate::context::Context;
-use crate::processor::Filter;
+use crate::context::ContextOld;
+use crate::processor::FilterOld;
 use serde_json::Value;
 
 pub struct ObjectsDiffFilter;
 
-impl Filter for ObjectsDiffFilter {
+impl FilterOld for ObjectsDiffFilter {
     fn filter_name(&self) -> &str {
         "objects-diff"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Handle object diffing
         // This would implement:
         // - Property comparison
@@ -22,12 +22,12 @@ impl Filter for ObjectsDiffFilter {
 
 pub struct ObjectsPatchFilter;
 
-impl Filter for ObjectsPatchFilter {
+impl FilterOld for ObjectsPatchFilter {
     fn filter_name(&self) -> &str {
         "objects-patch"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Handle object patching
         // This would apply object deltas to reconstruct the target object
 
@@ -37,12 +37,12 @@ impl Filter for ObjectsPatchFilter {
 
 pub struct ObjectsReverseFilter;
 
-impl Filter for ObjectsReverseFilter {
+impl FilterOld for ObjectsReverseFilter {
     fn filter_name(&self) -> &str {
         "objects-reverse"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Handle object reverse operations
         // This would reverse object delta operations
 
@@ -52,12 +52,12 @@ impl Filter for ObjectsReverseFilter {
 
 pub struct CollectChildrenObjectsDiffFilter;
 
-impl Filter for CollectChildrenObjectsDiffFilter {
+impl FilterOld for CollectChildrenObjectsDiffFilter {
     fn filter_name(&self) -> &str {
         "collect-children-objects-diff"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Collect children for object diff operations
         // This would prepare child contexts for object diffing
 
@@ -67,12 +67,12 @@ impl Filter for CollectChildrenObjectsDiffFilter {
 
 pub struct CollectChildrenObjectsPatchFilter;
 
-impl Filter for CollectChildrenObjectsPatchFilter {
+impl FilterOld for CollectChildrenObjectsPatchFilter {
     fn filter_name(&self) -> &str {
         "collect-children-objects-patch"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Collect children for object patch operations
         // This would prepare child contexts for object patching
 
@@ -82,12 +82,12 @@ impl Filter for CollectChildrenObjectsPatchFilter {
 
 pub struct CollectChildrenObjectsReverseFilter;
 
-impl Filter for CollectChildrenObjectsReverseFilter {
+impl FilterOld for CollectChildrenObjectsReverseFilter {
     fn filter_name(&self) -> &str {
         "collect-children-objects-reverse"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Collect children for object reverse operations
         // This would prepare child contexts for object reversing
 
@@ -95,7 +95,7 @@ impl Filter for CollectChildrenObjectsReverseFilter {
     }
 }
 
-pub fn create_objects_filters() -> Vec<Box<dyn Filter>> {
+pub fn create_objects_filters() -> Vec<Box<dyn FilterOld>> {
     vec![
         Box::new(ObjectsDiffFilter),
         Box::new(ObjectsPatchFilter),

@@ -1,15 +1,15 @@
-use crate::context::Context;
-use crate::processor::Filter;
+use crate::context::ContextOld;
+use crate::processor::FilterOld;
 use serde_json::Value;
 
 pub struct ArraysDiffFilter;
 
-impl Filter for ArraysDiffFilter {
+impl FilterOld for ArraysDiffFilter {
     fn filter_name(&self) -> &str {
         "arrays-diff"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Handle array diffing
         // This would implement:
         // - Array element comparison
@@ -22,12 +22,12 @@ impl Filter for ArraysDiffFilter {
 
 pub struct ArraysPatchFilter;
 
-impl Filter for ArraysPatchFilter {
+impl FilterOld for ArraysPatchFilter {
     fn filter_name(&self) -> &str {
         "arrays-patch"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Handle array patching
         // This would apply array deltas to reconstruct the target array
 
@@ -37,12 +37,12 @@ impl Filter for ArraysPatchFilter {
 
 pub struct ArraysReverseFilter;
 
-impl Filter for ArraysReverseFilter {
+impl FilterOld for ArraysReverseFilter {
     fn filter_name(&self) -> &str {
         "arrays-reverse"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Handle array reverse operations
         // This would reverse array delta operations
 
@@ -52,12 +52,12 @@ impl Filter for ArraysReverseFilter {
 
 pub struct CollectChildrenArraysPatchFilter;
 
-impl Filter for CollectChildrenArraysPatchFilter {
+impl FilterOld for CollectChildrenArraysPatchFilter {
     fn filter_name(&self) -> &str {
         "collect-children-arrays-patch"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Collect children for array patch operations
         // This would prepare child contexts for array patching
 
@@ -67,12 +67,12 @@ impl Filter for CollectChildrenArraysPatchFilter {
 
 pub struct CollectChildrenArraysReverseFilter;
 
-impl Filter for CollectChildrenArraysReverseFilter {
+impl FilterOld for CollectChildrenArraysReverseFilter {
     fn filter_name(&self) -> &str {
         "collect-children-arrays-reverse"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Collect children for array reverse operations
         // This would prepare child contexts for array reversing
 
@@ -80,7 +80,7 @@ impl Filter for CollectChildrenArraysReverseFilter {
     }
 }
 
-pub fn create_arrays_filters() -> Vec<Box<dyn Filter>> {
+pub fn create_arrays_filters() -> Vec<Box<dyn FilterOld>> {
     vec![
         Box::new(ArraysDiffFilter),
         Box::new(ArraysPatchFilter),

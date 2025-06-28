@@ -1,15 +1,15 @@
-use crate::context::Context;
-use crate::processor::Filter;
+use crate::context::ContextOld;
+use crate::processor::FilterOld;
 use serde_json::Value;
 
 pub struct DatesDiffFilter;
 
-impl Filter for DatesDiffFilter {
+impl FilterOld for DatesDiffFilter {
     fn filter_name(&self) -> &str {
         "dates-diff"
     }
 
-    fn process(&self, context: &mut Box<dyn Context>) {
+    fn process(&self, context: &mut Box<dyn ContextOld>) {
         // Handle date diffing
         // This would implement:
         // - Date comparison
@@ -20,8 +20,6 @@ impl Filter for DatesDiffFilter {
     }
 }
 
-pub fn create_dates_filters() -> Vec<Box<dyn Filter>> {
-    vec![
-        Box::new(DatesDiffFilter),
-    ]
+pub fn create_dates_filters() -> Vec<Box<dyn FilterOld>> {
+    vec![Box::new(DatesDiffFilter)]
 }

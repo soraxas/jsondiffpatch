@@ -1,66 +1,95 @@
 use crate::clone::clone;
-use crate::processor::{Processor, Pipe};
-use crate::types::{Delta, Options};
-use crate::filters::{
-    create_trivial_filters,
-    create_arrays_filters,
-    create_objects_filters,
-    create_texts_filters,
-    create_dates_filters,
+use crate::context::DiffContext;
+use crate::filters::nested::{
+    CollectionChildrenDiffFilter,
+    ObjectsDiffFilter,
 };
+use crate::filters::TrivialDiffFilter;
+use crate::processor::{Pipe, Processor};
+use crate::types::{Delta, Options};
 use serde_json::Value;
 
 pub struct DiffPatcher {
-    processor: Processor,
+    // processor: Processor,
 }
 
 impl DiffPatcher {
     pub fn new(options: Option<Options>) -> Self {
-        let mut processor = Processor::new(options);
+        // let mut processor = Processor::new(options);
 
-        // Set up diff pipe
-        let diff_pipe = Pipe::new("diff".to_string())
-            .append(create_trivial_filters())
-            .append(create_dates_filters())
-            .append(create_texts_filters())
-            .append(create_objects_filters())
-            .append(create_arrays_filters())
-            .should_have_result();
+        // // Set up diff pipe
+        // let diff_pipe = Pipe::new("diff".to_string())
+        //     .append(create_trivial_filters())
+        //     .append(create_dates_filters())
+        //     .append(create_texts_filters())
+        //     .append(create_objects_filters())
+        //     .append(create_arrays_filters())
+        //     .should_have_result();
 
-        // Set up patch pipe
-        let patch_pipe = Pipe::new("patch".to_string())
-            .append(create_trivial_filters())
-            .append(create_texts_filters())
-            .append(create_objects_filters())
-            .append(create_arrays_filters())
-            .should_have_result();
+        // // Set up patch pipe
+        // let patch_pipe = Pipe::new("patch".to_string())
+        //     .append(create_trivial_filters())
+        //     .append(create_texts_filters())
+        //     .append(create_objects_filters())
+        //     .append(create_arrays_filters())
+        //     .should_have_result();
 
-        // Set up reverse pipe
-        let reverse_pipe = Pipe::new("reverse".to_string())
-            .append(create_trivial_filters())
-            .append(create_texts_filters())
-            .append(create_objects_filters())
-            .append(create_arrays_filters())
-            .should_have_result();
+        // // Set up reverse pipe
+        // let reverse_pipe = Pipe::new("reverse".to_string())
+        //     .append(create_trivial_filters())
+        //     .append(create_texts_filters())
+        //     .append(create_objects_filters())
+        //     .append(create_arrays_filters())
+        //     .should_have_result();
 
-        processor.pipe("diff", Box::new(diff_pipe));
-        processor.pipe("patch", Box::new(patch_pipe));
-        processor.pipe("reverse", Box::new(reverse_pipe));
+        // processor.pipe("diff", Box::new(diff_pipe));
+        // processor.pipe("patch", Box::new(patch_pipe));
+        // processor.pipe("reverse", Box::new(reverse_pipe));
 
-        Self { processor }
+        Self {
+            // processor
+        }
     }
 
     pub fn options(&self) -> &Options {
-        self.processor.options()
+        todo!()
+        // self.processor.options()
     }
 
     pub fn set_options(&mut self, options: Options) {
-        self.processor.set_options(options);
+        todo!()
+        // self.processor.set_options(options);
     }
 
-    pub fn diff(&self, _left: &Value, _right: &Value) -> Option<Delta> {
+    pub fn diff(&self, left: &Value, right: &Value) -> Option<Delta> {
         // Create a diff context
+        let mut context = DiffContext::new(left, right);
+
+        // panic!("test");
+
+        let mut diff_pipe = Pipe::new("diff".to_string())
+            // .append(Box::new(CollectionChildrenDiffFilter))
+            .append(Box::new(CollectionChildrenDiffFilter))
+            .append(Box::new(TrivialDiffFilter))
+            .append(Box::new(ObjectsDiffFilter))
+            // .append(Box::new(CollectionChildrenReverseFilter))
+            // .append(create_dates_filters())
+            // .append(create_texts_filters())
+            // .append(create_objects_filters())
+            // .append(create_arrays_filters())
+            .should_have_result();
+
+        // diff_pipe.process(&mut context);
+
+        let processor = Processor::new(None);
+        processor.process(&mut context, &mut diff_pipe);
+
+
+        dbg!(&context.get_result());
+
+
         // For now, return None as the implementation is simplified
+        // In a full implementation, this would process the context through the pipeline
         None
     }
 
@@ -98,7 +127,7 @@ mod tests {
     #[test]
     fn test_diffpatcher_creation() {
         let diffpatcher = DiffPatcher::new(None);
-        assert!(diffpatcher.options().match_by_position.unwrap_or(false) == false);
+        assert!(!diffpatcher.options().match_by_position.unwrap_or(false));
     }
 
     #[test]
