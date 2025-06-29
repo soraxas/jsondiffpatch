@@ -1,4 +1,4 @@
-use jsondiffpatch_rs::{
+use jsondiffpatch::{
     diff, patch,
     types::{ArrayDeltaIndex, Delta},
 };
