@@ -3,9 +3,9 @@ name = "jsondiffpatch_rs"
 version = "0.1.0"
 edition = "2021"
 description = "JSON diff & patch (object and array diff, text diff, multiple output formats)"
-authors = ["Benjamin Eidelman <beneidel@gmail.com>"]
+authors = ["Tin Lai <tin@tinyiu.com>"]
 license = "MIT"
-repository = "https://github.com/benjamine/jsondiffpatch"
+repository = "https://github.com/soraxas/jsondiffpatch-rs"
 keywords = ["json", "diff", "patch"]
 categories = ["data-structures", "algorithms"]
 
