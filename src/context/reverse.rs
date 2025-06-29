@@ -1,6 +1,5 @@
 use crate::context::{ContextData, FilterContext};
-use crate::types::{Delta, Options};
-use std::rc::Rc;
+use crate::types::Delta;
 
 #[derive(Debug)]
 pub struct ReverseContext<'a> {
@@ -22,10 +21,10 @@ impl<'a> FilterContext for ReverseContext<'a> {
 }
 
 impl<'a> ReverseContext<'a> {
-    pub fn new(delta: Delta<'a>, options: Rc<Options>) -> Self {
+    pub fn new(delta: Delta<'a>) -> Self {
         Self {
             delta,
-            context_data: ContextData::new(options),
+            context_data: ContextData::new(),
             new_name: None,
         }
     }

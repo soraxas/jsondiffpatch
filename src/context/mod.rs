@@ -5,12 +5,11 @@ pub mod reverse;
 pub use diff::DiffContext;
 pub use patch::PatchContext;
 
-use crate::types::Options;
-use std::rc::Rc;
+use crate::types::{Options, OPTIONS};
 
 /// A trait that defines the interface for filter contexts.
 ///
-/// Filter contexts are used to store the result of a filter and to track the state of the filter.
+/// Pipeline contexts are used to store the result of a filter and to track the state of the filter.
 pub trait FilterContext
 where
     Self: Sized,
@@ -51,8 +50,8 @@ where
         self.inner_data().is_exiting()
     }
 
-    fn options(&self) -> &Rc<Options> {
-        &self.inner_data().options
+    fn options(&self) -> &Options {
+        OPTIONS.get().expect("options not set")
     }
 
     fn inner_data(&self) -> &ContextData<Self>;
@@ -63,15 +62,13 @@ where
 pub struct ContextData<FC: FilterContext> {
     result: Option<FC::Result>,
     exiting: bool,
-    pub options: Rc<Options>,
 }
 
 impl<FC: FilterContext> ContextData<FC> {
-    pub fn new(options: Rc<Options>) -> Self {
+    pub fn new() -> Self {
         Self {
             result: None,
             exiting: false,
-            options,
         }
     }
 

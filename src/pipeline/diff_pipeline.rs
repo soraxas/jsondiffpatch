@@ -1,15 +1,15 @@
 use crate::context::{DiffContext, FilterContext};
 use crate::errors::JsonDiffPatchError;
-use crate::filters::arrays::{post_process_arrays_diff, process_arrays_diff};
-use crate::filters::texts::process_text_diff;
-use crate::processor::Filter;
+use crate::pipeline::arrays::{post_process_arrays_diff, process_arrays_diff};
+use crate::pipeline::texts::process_text_diff;
+use crate::processor::Pipeline;
 use crate::types::Delta;
 use serde_json::Value;
 use std::collections::HashMap;
 
 pub struct DiffPipeline;
 
-impl<'a> Filter<DiffContext<'a>, Delta<'a>> for DiffPipeline {
+impl<'a> Pipeline<DiffContext<'a>, Delta<'a>> for DiffPipeline {
     fn filter_name(&self) -> &str {
         "diff-pipeline"
     }
@@ -45,21 +45,15 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for DiffPipeline {
                     for (key, value) in left {
                         new_children_context.push((
                             key.to_string(),
-                            DiffContext::new(
-                                value,
-                                right.get(key).unwrap_or(&Value::Null),
-                                context.options().clone(),
-                            ),
+                            DiffContext::new(value, right.get(key).unwrap_or(&Value::Null)),
                         ));
                     }
 
                     // process keys from right (with potential additions)
                     for (key, value) in right {
                         if !left.contains_key(key) {
-                            new_children_context.push((
-                                key.to_string(),
-                                DiffContext::new(&Value::Null, value, context.options().clone()),
-                            ));
+                            new_children_context
+                                .push((key.to_string(), DiffContext::new(&Value::Null, value)));
                         }
                     }
 

@@ -1,8 +1,8 @@
 pub mod context;
 pub mod diffpatcher;
 pub mod errors;
-pub mod filters;
 pub mod lcs;
+pub mod pipeline;
 pub mod processor;
 pub mod types;
 

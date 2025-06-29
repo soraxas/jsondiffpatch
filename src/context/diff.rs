@@ -1,7 +1,6 @@
 use crate::context::{ContextData, FilterContext};
-use crate::types::{Delta, Options};
+use crate::types::Delta;
 use serde_json::Value;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct DiffContext<'a> {
@@ -28,11 +27,11 @@ impl<'a> FilterContext for DiffContext<'a> {
 }
 
 impl<'a> DiffContext<'a> {
-    pub fn new(left: &'a Value, right: &'a Value, options: Rc<Options>) -> Self {
+    pub fn new(left: &'a Value, right: &'a Value) -> Self {
         Self {
             left,
             right,
-            context_data: ContextData::new(options),
+            context_data: ContextData::new(),
         }
     }
 }

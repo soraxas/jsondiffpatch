@@ -2,15 +2,13 @@ use crate::context::{DiffContext, FilterContext};
 use crate::errors::JsonDiffPatchError;
 use crate::types::Delta;
 use diff_match_patch_rs::{DiffMatchPatch, Efficient, PatchInput};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 const DEFAULT_MIN_LENGTH: usize = 60;
 
 pub struct PatchPipeline;
 
-lazy_static! {
-    pub(crate) static ref DMP: DiffMatchPatch = DiffMatchPatch::new();
-}
+pub(crate) static DMP: Lazy<DiffMatchPatch> = Lazy::new(DiffMatchPatch::new);
 
 pub fn process_text_diff<'a>(
     context: &mut DiffContext<'a>,
@@ -34,9 +32,9 @@ pub fn process_text_diff<'a>(
     }
 
     // Try to use text-diff algorithm
-    let diffs = DMP.diff_main::<Efficient>(left, right).unwrap();
+    let diffs = DMP.diff_main::<Efficient>(left, right)?;
     // Now, we are going to create a list of `patches` to be applied to the old text to get the new text
-    let patches = DMP.patch_make(PatchInput::new_diffs(&diffs)).unwrap();
+    let patches = DMP.patch_make(PatchInput::new_diffs(&diffs))?;
     // in the real world you are going to transmit or store this diff serialized to undiff format to be consumed or used somewhere elese
     let patch_txt = DMP.patch_to_text(&patches);
 

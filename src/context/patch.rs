@@ -1,7 +1,6 @@
 use crate::context::{ContextData, FilterContext};
-use crate::types::{Delta, Options};
+use crate::types::Delta;
 use serde_json::Value;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct PatchContext<'a> {
@@ -23,11 +22,11 @@ impl<'a> FilterContext for PatchContext<'a> {
 }
 
 impl<'a> PatchContext<'a> {
-    pub fn new(left: &'a Value, delta: Delta<'a>, options: Rc<Options>) -> Self {
+    pub fn new(left: &'a Value, delta: Delta<'a>) -> Self {
         Self {
             left,
             delta,
-            context_data: ContextData::new(options),
+            context_data: ContextData::new(),
         }
     }
 }

@@ -28,8 +28,8 @@ use serde_json::Value;
 /// This difference arises because the dynamic programming table is filled differently based
 /// on the input order, leading to different tie-breaking decisions and thus different LCS results.
 pub fn longest_common_subsequence(
-    first_seq: &Vec<Value>,
-    second_seq: &Vec<Value>,
+    first_seq: &[Value],
+    second_seq: &[Value],
 ) -> Vec<(usize, usize)> {
     let lcs_lengths = initialize_lcs_lengths(first_seq, second_seq);
 

@@ -1,12 +1,23 @@
 use crate::errors::JsonDiffPatchReverseError;
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt;
 
-const MAGIC_NUMBER_DELETED: u32 = 0;
-const MAGIC_NUMBER_UNDEFINED_DIFF: u32 = 2;
-const MAGIC_NUMBER_ARRAY_MOVED: u32 = 3;
+const MIDDLE_NO_VALUE: u32 = 0;
+
+pub enum MagicNumber {
+    Deleted = 0,
+    UndefinedDiff = 2,
+    ArrayMoved = 3,
+}
+
+impl From<MagicNumber> for Value {
+    fn from(magic: MagicNumber) -> Value {
+        Value::Number(serde_json::Number::from(magic as u32))
+    }
+}
 
 #[derive(Clone)]
 pub struct Options {
@@ -47,10 +58,25 @@ impl fmt::Debug for Options {
     }
 }
 
+pub(crate) static OPTIONS: OnceCell<Options> = OnceCell::new();
+
 #[derive(Debug, Clone)]
 pub enum ArrayDeltaIndex {
     NewOrModified(usize),  // index are in-place (previous or new index)
     RemovedOrMoved(usize), // index are the old index
+}
+
+impl ArrayDeltaIndex {
+    pub fn to_serializable(&self) -> String {
+        match self {
+            ArrayDeltaIndex::NewOrModified(index) => {
+                format!("{}", index)
+            }
+            ArrayDeltaIndex::RemovedOrMoved(index) => {
+                format!("_{}", index)
+            }
+        }
+    }
 }
 
 impl PartialEq for ArrayDeltaIndex {
@@ -63,27 +89,22 @@ impl Eq for ArrayDeltaIndex {}
 
 impl PartialOrd for ArrayDeltaIndex {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // if both are of the same type, compare by the index value
-        match (self, other) {
-            (ArrayDeltaIndex::NewOrModified(a), ArrayDeltaIndex::NewOrModified(b)) => {
-                Some(a.cmp(b))
-            }
-            (ArrayDeltaIndex::RemovedOrMoved(a), ArrayDeltaIndex::RemovedOrMoved(b)) => {
-                Some(a.cmp(b))
-            }
-            (ArrayDeltaIndex::RemovedOrMoved(_), ArrayDeltaIndex::NewOrModified(_)) => {
-                Some(std::cmp::Ordering::Less)
-            }
-            (ArrayDeltaIndex::NewOrModified(_), ArrayDeltaIndex::RemovedOrMoved(_)) => {
-                Some(std::cmp::Ordering::Greater)
-            }
-        }
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for ArrayDeltaIndex {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        match (self, other) {
+            (ArrayDeltaIndex::NewOrModified(a), ArrayDeltaIndex::NewOrModified(b)) => a.cmp(b),
+            (ArrayDeltaIndex::RemovedOrMoved(a), ArrayDeltaIndex::RemovedOrMoved(b)) => a.cmp(b),
+            (ArrayDeltaIndex::RemovedOrMoved(_), ArrayDeltaIndex::NewOrModified(_)) => {
+                std::cmp::Ordering::Less
+            }
+            (ArrayDeltaIndex::NewOrModified(_), ArrayDeltaIndex::RemovedOrMoved(_)) => {
+                std::cmp::Ordering::Greater
+            }
+        }
     }
 }
 
@@ -109,9 +130,11 @@ impl<'a> Delta<'a> {
             Delta::Modified(old_value, new_value) => {
                 Value::Array(vec![old_value.clone(), new_value.clone()])
             }
-            Delta::Deleted(deleted) => {
-                Value::Array(vec![deleted.clone(), 0.into(), MAGIC_NUMBER_DELETED.into()])
-            }
+            Delta::Deleted(deleted) => Value::Array(vec![
+                deleted.clone(),
+                MIDDLE_NO_VALUE.into(),
+                MagicNumber::Deleted.into(),
+            ]),
             Delta::Object(value) => Value::Object(
                 value
                     .into_iter()
@@ -123,15 +146,7 @@ impl<'a> Delta<'a> {
                 // marker
                 changes.insert("_t".to_string(), Value::String("a".to_string()));
                 for (index, delta) in array_changes {
-                    let key = match index {
-                        ArrayDeltaIndex::NewOrModified(index) => {
-                            format!("{}", index)
-                        }
-                        ArrayDeltaIndex::RemovedOrMoved(index) => {
-                            format!("_{}", index)
-                        }
-                    };
-                    changes.insert(key, delta.to_serializable());
+                    changes.insert(index.to_serializable(), delta.to_serializable());
                 }
                 Value::Object(changes)
             }
@@ -141,9 +156,13 @@ impl<'a> Delta<'a> {
             } => Value::Array(vec![
                 moved_value.unwrap_or(&Value::Null).clone(),
                 new_index.into(),
-                MAGIC_NUMBER_ARRAY_MOVED.into(),
+                MagicNumber::ArrayMoved.into(),
             ]),
-            Delta::TextDiff(uni_diff) => Value::Array(vec![uni_diff.into(), 0.into(), 2.into()]),
+            Delta::TextDiff(uni_diff) => Value::Array(vec![
+                uni_diff.into(),
+                MIDDLE_NO_VALUE.into(),
+                MagicNumber::UndefinedDiff.into(),
+            ]),
             Delta::None => {
                 panic!("Delta::None is not serializable");
                 // Value::Null

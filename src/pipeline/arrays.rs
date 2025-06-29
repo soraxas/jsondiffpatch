@@ -53,11 +53,7 @@ pub fn process_arrays_diff<'a>(
         && common_head < len2
         && left_array[common_head] == right_array[common_head]
     {
-        let child_context = DiffContext::new(
-            &left_array[common_head],
-            &right_array[common_head],
-            context.options().clone(),
-        );
+        let child_context = DiffContext::new(&left_array[common_head], &right_array[common_head]);
         new_children_context.push((common_head.to_string(), child_context));
         common_head += 1;
     }
@@ -70,11 +66,7 @@ pub fn process_arrays_diff<'a>(
     {
         let index1 = len1 - 1 - common_tail;
         let index2 = len2 - 1 - common_tail;
-        let child_context = DiffContext::new(
-            &left_array[index1],
-            &right_array[index2],
-            context.options().clone(),
-        );
+        let child_context = DiffContext::new(&left_array[index1], &right_array[index2]);
         new_children_context.push((index2.to_string(), child_context));
         common_tail += 1;
     }
@@ -88,11 +80,13 @@ pub fn process_arrays_diff<'a>(
         }
         // trivial case, a block was added
         let mut array_changes = Vec::new();
-        for index in common_head..len2 - common_tail {
-            array_changes.push((
-                ArrayDeltaIndex::NewOrModified(index),
-                Delta::Added(&right_array[index]),
-            ));
+        for (index, val) in right_array
+            .iter()
+            .enumerate()
+            .take(len2 - common_tail)
+            .skip(common_head)
+        {
+            array_changes.push((ArrayDeltaIndex::NewOrModified(index), Delta::Added(val)));
         }
         context.set_result(Delta::Array(array_changes)).exit();
         return Ok(());
@@ -101,11 +95,13 @@ pub fn process_arrays_diff<'a>(
     if common_head + common_tail == len2 {
         // trivial case, a block was removed
         let mut array_changes = Vec::new();
-        for index in common_head..len1 - common_tail {
-            array_changes.push((
-                ArrayDeltaIndex::RemovedOrMoved(index),
-                Delta::Deleted(&left_array[index]),
-            ));
+        for (index, val) in left_array
+            .iter()
+            .enumerate()
+            .take(len1 - common_tail)
+            .skip(common_head)
+        {
+            array_changes.push((ArrayDeltaIndex::RemovedOrMoved(index), Delta::Deleted(val)));
         }
         context.set_result(Delta::Array(array_changes)).exit();
         return Ok(());
@@ -114,7 +110,7 @@ pub fn process_arrays_diff<'a>(
     // Use LCS algorithm on the trimmed arrays
     let trimmed1 = &left_array[common_head..len1 - common_tail];
     let trimmed2 = &right_array[common_head..len2 - common_tail];
-    let lcs_indices = lcs::longest_common_subsequence(&trimmed1.to_vec(), &trimmed2.to_vec());
+    let lcs_indices = lcs::longest_common_subsequence(trimmed1, trimmed2);
 
     let mut array_changes = Vec::new();
     let mut removed_items = Vec::new();
@@ -146,7 +142,7 @@ pub fn process_arrays_diff<'a>(
         .unwrap_or(false);
 
     // Process items in the right array
-    for j in 0..trimmed2.len() {
+    for (j, val) in trimmed2.iter().enumerate() {
         let original_index2 = j + common_head;
         let lcs_index = lcs_indices.iter().position(|&(_, lcs_j)| lcs_j == j);
 
@@ -157,7 +153,7 @@ pub fn process_arrays_diff<'a>(
                 for (remove_idx, &removed_index) in removed_items.iter().enumerate() {
                     let trimmed_removed_index = removed_index - common_head;
                     if trimmed_removed_index < trimmed1.len()
-                        && trimmed1[trimmed_removed_index] == trimmed2[j]
+                        && &trimmed1[trimmed_removed_index] == val
                     {
                         // Found a match, convert deletion to move
                         // Remove the deletion from array_changes
@@ -187,7 +183,6 @@ pub fn process_arrays_diff<'a>(
                         let child_context = DiffContext::new(
                             &left_array[removed_index],
                             &right_array[original_index2],
-                            context.options().clone(),
                         );
                         new_children_context.push((original_index2.to_string(), child_context));
 
@@ -207,17 +202,16 @@ pub fn process_arrays_diff<'a>(
             }
         } else {
             // Item is in LCS, check for nested changes
-            let lcs_idx = lcs_index.unwrap();
+            let lcs_idx = lcs_index.ok_or_else(|| {
+                JsonDiffPatchError::InternalPatchLogicError("lcs_index is none".to_string())
+            })?;
             let (i, _) = lcs_indices[lcs_idx];
             let original_index1 = i + common_head;
 
             if trimmed1[i] != trimmed2[j] {
                 // Items are different, create child context for nested diff
-                let child_context = DiffContext::new(
-                    &left_array[original_index1],
-                    &right_array[original_index2],
-                    context.options().clone(),
-                );
+                let child_context =
+                    DiffContext::new(&left_array[original_index1], &right_array[original_index2]);
                 new_children_context.push((original_index2.to_string(), child_context));
             }
         }
@@ -264,12 +258,9 @@ pub fn post_process_arrays_diff<'a>(
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use super::*;
     use crate::context::PatchContext;
-    use crate::filters::patch_pipeline::handle_array;
-    use crate::Options;
+    use crate::pipeline::patch_pipeline::handle_array;
     use serde_json::Value;
 
     struct ArrayPatchTestCase<'a> {
@@ -374,8 +365,7 @@ mod tests {
         for test_case in test_cases {
             println!("Running test: {}", test_case.name);
 
-            let options = Rc::new(Options::default());
-            let context = PatchContext::new(&test_case.original, test_case.delta, options);
+            let context = PatchContext::new(&test_case.original, test_case.delta);
 
             let mut new_children_context = Vec::new();
             let result = {
@@ -441,8 +431,7 @@ mod tests {
         for test_case in edge_cases {
             println!("Running edge case test: {}", test_case.name);
 
-            let options = Rc::new(Options::default());
-            let context = PatchContext::new(&test_case.original, test_case.delta, options);
+            let context = PatchContext::new(&test_case.original, test_case.delta);
 
             let mut new_children_context = Vec::new();
             let result = {

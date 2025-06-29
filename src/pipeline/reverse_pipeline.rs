@@ -1,16 +1,16 @@
 use crate::context::{FilterContext, PatchContext};
 use crate::errors::JsonDiffPatchError;
-use crate::filters::texts::DMP;
-use crate::processor::Filter;
+use crate::pipeline::texts::DMP;
+use crate::processor::Pipeline;
 use crate::types::{ArrayDeltaIndex, Delta};
 use diff_match_patch_rs::Efficient;
-use serde_json::Value;
+use serde_json::{Map, Value};
 
-pub struct PatchPipeline;
+pub struct ReversePipeline;
 
-impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
+impl<'a> Pipeline<PatchContext<'a>, Value> for ReversePipeline {
     fn filter_name(&self) -> &str {
-        "patch-pipeline"
+        "reverse-pipeline"
     }
 
     fn process(
@@ -20,15 +20,7 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
     ) -> Result<(), JsonDiffPatchError> {
         match &context.delta {
             Delta::Object(object_delta) => {
-                for (key, value) in object_delta {
-                    let child = PatchContext::new(
-                        context.left.get(key).unwrap_or(&Value::Null),
-                        value.clone(),
-                        context.options().clone(),
-                    );
-                    new_children_context.push((key.to_string(), child));
-                }
-                context.exit();
+                todo!()
             }
             Delta::Array(array_delta) => {
                 let mut container = vec![];
@@ -43,7 +35,7 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
                 )?;
                 // handle new children
                 for (name, value, delta) in container {
-                    let child_context = PatchContext::new(value, delta, context.options().clone());
+                    let child_context = PatchContext::new(value, delta);
                     new_children_context.push((name, child_context));
                 }
 
@@ -124,24 +116,17 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
                 // context.set_result(Value::Array(array)).exit();
             }
             Delta::Object(_changes) => {
-                let mut new_object = context
-                    .left
-                    .as_object()
-                    .ok_or_else(|| JsonDiffPatchError::InvalidPatchToTarget {
-                        patch: "object".to_string(),
-                    })?
-                    .clone();
+                let mut reversed_changes = Map::new();
 
                 // Collect results from children and apply them to the object
-                for (key, child_context) in children_context {
-                    if let Some(child_result) = child_context.get_result() {
-                        new_object.insert(key.clone(), child_result.clone());
-                    } else {
-                        new_object.remove(key);
-                    }
+                for (key, child_context) in children_context
+                    .iter()
+                    .filter_map(|(key, context)| context.get_result().map(|result| (key, result)))
+                {
+                    reversed_changes.insert(key.clone(), child_context.clone());
                 }
 
-                context.set_result(Value::Object(new_object)).exit();
+                context.set_result(Value::Object(reversed_changes)).exit();
             }
             _ => {}
         }
