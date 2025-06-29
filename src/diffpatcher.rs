@@ -1,10 +1,7 @@
 use crate::clone::clone;
 use crate::context::{DiffContext, FilterContext, PatchContext};
-use crate::filters::arrays::ArraysDiffFilter;
-use crate::filters::nested::{CollectionChildrenDiffFilter, ObjectsDiffFilter};
+use crate::filters::diff_pipeline::DiffPipeline;
 use crate::filters::patch_pipeline::PatchPipeline;
-use crate::filters::texts::TextsDiffFilter;
-use crate::filters::TrivialDiffFilter;
 use crate::processor::{Pipe, Processor};
 use crate::types::{Delta, Options};
 use serde_json::Value;
@@ -12,11 +9,7 @@ use std::rc::Rc;
 
 pub fn build_diff_pipe<'a>() -> Pipe<DiffContext<'a>, Delta<'a>> {
     Pipe::new("diff".to_string())
-        .append(Box::new(CollectionChildrenDiffFilter))
-        .append(Box::new(TrivialDiffFilter))
-        .append(Box::new(TextsDiffFilter))
-        .append(Box::new(ObjectsDiffFilter))
-        .append(Box::new(ArraysDiffFilter))
+        .append(Box::new(DiffPipeline))
         .should_have_result()
 }
 

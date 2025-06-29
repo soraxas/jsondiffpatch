@@ -2,15 +2,13 @@ use crate::context::{FilterContext, PatchContext};
 use crate::errors::JsonDiffPatchError;
 use crate::processor::Filter;
 use crate::types::{ArrayDeltaIndex, Delta};
-use diff_match_patch_rs::{DiffMatchPatch, Efficient};
-use lazy_static::lazy_static;
+use diff_match_patch_rs::Efficient;
 use serde_json::Value;
+use crate::filters::texts::DMP;
 
 pub struct PatchPipeline;
 
-lazy_static! {
-    static ref DMP: DiffMatchPatch = DiffMatchPatch::new();
-}
+
 
 impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
     fn filter_name(&self) -> &str {
