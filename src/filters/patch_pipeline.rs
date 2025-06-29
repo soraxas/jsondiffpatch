@@ -1,14 +1,12 @@
 use crate::context::{FilterContext, PatchContext};
 use crate::errors::JsonDiffPatchError;
+use crate::filters::texts::DMP;
 use crate::processor::Filter;
 use crate::types::{ArrayDeltaIndex, Delta};
 use diff_match_patch_rs::Efficient;
 use serde_json::Value;
-use crate::filters::texts::DMP;
 
 pub struct PatchPipeline;
-
-
 
 impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
     fn filter_name(&self) -> &str {
@@ -80,7 +78,9 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
                     Ok(patches) => {
                         let (new_txt, ops) = DMP.patch_apply(&patches, left_txt)?;
                         ops.iter().for_each(|op| {
-                            println!("{}", if *op { "OK" } else { "FAIL" });
+                            if !op {
+                                log::error!("some text-diff patch applied failed");
+                            }
                         });
 
                         context.set_result(Value::String(new_txt)).exit();

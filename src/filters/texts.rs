@@ -6,7 +6,6 @@ use lazy_static::lazy_static;
 
 const DEFAULT_MIN_LENGTH: usize = 60;
 
-
 pub struct PatchPipeline;
 
 lazy_static! {

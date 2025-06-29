@@ -378,7 +378,7 @@ mod tests {
             let context = PatchContext::new(&test_case.original, test_case.delta, options);
 
             let mut new_children_context = Vec::new();
-            {
+            let result = {
                 let Delta::Array(array_delta) = &context.delta else {
                     panic!("Test '{}' failed: delta is not an array", test_case.name);
                 };
@@ -387,8 +387,8 @@ mod tests {
                     array_delta,
                     &mut new_children_context,
                 )
-                .unwrap();
-            }
+                .unwrap()
+            };
 
             assert_eq!(
                 new_children_context.len(),
@@ -399,15 +399,11 @@ mod tests {
                 new_children_context.len()
             );
 
-            if let Some(result) = context.get_result() {
-                assert_eq!(
-                    result, &test_case.expected,
-                    "Test '{}' failed: expected {:?}, got {:?}",
-                    test_case.name, test_case.expected, result
-                );
-            } else {
-                panic!("Test '{}' failed: no result returned", test_case.name);
-            }
+            assert_eq!(
+                result, test_case.expected,
+                "Test '{}' failed: expected {:?}, got {:?}",
+                test_case.name, test_case.expected, result
+            );
         }
     }
 
@@ -449,7 +445,7 @@ mod tests {
             let context = PatchContext::new(&test_case.original, test_case.delta, options);
 
             let mut new_children_context = Vec::new();
-            {
+            let result = {
                 let Delta::Array(array_delta) = &context.delta else {
                     panic!("Test '{}' failed: delta is not an array", test_case.name);
                 };
@@ -458,8 +454,8 @@ mod tests {
                     array_delta,
                     &mut new_children_context,
                 )
-                .unwrap();
-            }
+                .unwrap()
+            };
 
             assert_eq!(
                 new_children_context.len(),
@@ -470,18 +466,11 @@ mod tests {
                 new_children_context.len()
             );
 
-            if let Some(result) = context.get_result() {
-                assert_eq!(
-                    result, &test_case.expected,
-                    "Edge case test '{}' failed: expected {:?}, got {:?}",
-                    test_case.name, test_case.expected, result
-                );
-            } else {
-                panic!(
-                    "Edge case test '{}' failed: no result returned",
-                    test_case.name
-                );
-            }
+            assert_eq!(
+                result, test_case.expected,
+                "Edge case test '{}' failed: expected {:?}, got {:?}",
+                test_case.name, test_case.expected, result
+            );
         }
     }
 }

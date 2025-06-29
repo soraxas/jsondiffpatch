@@ -1,5 +1,5 @@
 use jsondiffpatch_rs::{
-    clone, diff, patch,
+    diff, patch,
     types::{ArrayDeltaIndex, Delta},
 };
 use serde_json::json;
@@ -77,7 +77,7 @@ fn main() {
             "string": "hello"
         }
     });
-    let cloned = clone(&original);
+    let cloned = original.clone();
     println!("Original: {}", original);
     println!("Cloned:   {}", cloned);
     println!("Equal:    {}", original == cloned);

@@ -1,6 +1,4 @@
-pub mod clone;
 pub mod context;
-pub mod date_reviver;
 pub mod diffpatcher;
 pub mod errors;
 pub mod filters;
@@ -8,7 +6,6 @@ pub mod lcs;
 pub mod processor;
 pub mod types;
 
-pub use date_reviver::date_reviver;
 pub use diffpatcher::DiffPatcher;
 pub use types::{Delta, Options};
 
@@ -38,9 +35,4 @@ pub fn unpatch(right: &serde_json::Value, delta: &Delta) -> Option<serde_json::V
 pub fn reverse<'a>(delta: &Delta<'a>) -> Option<Delta<'a>> {
     let instance = DEFAULT_INSTANCE.get_or_init(|| DiffPatcher::new(None));
     instance.reverse(delta)
-}
-
-pub fn clone(value: &serde_json::Value) -> serde_json::Value {
-    let instance = DEFAULT_INSTANCE.get_or_init(|| DiffPatcher::new(None));
-    instance.clone(value)
 }

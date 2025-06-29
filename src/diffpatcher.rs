@@ -1,4 +1,3 @@
-use crate::clone::clone;
 use crate::context::{DiffContext, FilterContext, PatchContext};
 use crate::filters::diff_pipeline::DiffPipeline;
 use crate::filters::patch_pipeline::PatchPipeline;
@@ -98,29 +97,5 @@ impl DiffPatcher {
         } else {
             None
         }
-    }
-
-    pub fn clone(&self, value: &Value) -> Value {
-        clone(value)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_diffpatcher_creation() {
-        let diffpatcher = DiffPatcher::new(None);
-        assert!(!diffpatcher.options().match_by_position.unwrap_or(false));
-    }
-
-    #[test]
-    fn test_clone() {
-        let diffpatcher = DiffPatcher::new(None);
-        let original = json!({"a": 1, "b": "hello"});
-        let cloned = diffpatcher.clone(&original);
-        assert_eq!(original, cloned);
     }
 }
