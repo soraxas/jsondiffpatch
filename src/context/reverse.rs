@@ -4,14 +4,14 @@ use serde_json::Value;
 use std::rc::Rc;
 
 #[derive(Debug)]
-pub struct PatchContext<'a> {
+pub struct ReverseContext<'a> {
     context_data: ContextData<Self>,
-    pub left: &'a Value,
     pub delta: Delta<'a>,
+    pub new_name: Option<&'a str>,
 }
 
-impl<'a> FilterContext for PatchContext<'a> {
-    type Result = Value;
+impl<'a> FilterContext for ReverseContext<'a> {
+    type Result = Delta<'a>;
 
     fn inner_data(&self) -> &ContextData<Self> {
         &self.context_data
@@ -22,12 +22,12 @@ impl<'a> FilterContext for PatchContext<'a> {
     }
 }
 
-impl<'a> PatchContext<'a> {
-    pub fn new(left: &'a Value, delta: Delta<'a>, options: Rc<Options>) -> Self {
+impl<'a> ReverseContext<'a> {
+    pub fn new(delta: Delta<'a>, options: Rc<Options>) -> Self {
         Self {
-            left,
             delta,
             context_data: ContextData::new(options),
+            new_name: None,
         }
     }
 }

@@ -1,5 +1,9 @@
-use jsondiffpatch_rs::{clone, diff};
+use jsondiffpatch_rs::{
+    clone, diff, patch,
+    types::{ArrayDeltaIndex, Delta},
+};
 use serde_json::json;
+use std::collections::HashMap;
 
 fn main() {
     env_logger::init();
@@ -35,7 +39,16 @@ fn main() {
     println!("Right: {}", right);
 
     if let Some(delta) = diff(&left, &right) {
-        println!("Delta: {:?}", delta);
+        println!("Delta: {:#?}", delta);
+        // try apply the delta
+        let patched = patch(&left, delta).unwrap();
+        println!("Patched: {:?}", patched);
+        println!(
+            "Patched: {}",
+            serde_json::to_string_pretty(&patched).unwrap()
+        );
+        println!("Right: {}", serde_json::to_string_pretty(&right).unwrap());
+        assert_eq!(patched, right);
     } else {
         println!("No differences found or diff not implemented yet");
     }
@@ -50,6 +63,9 @@ fn main() {
 
     if let Some(delta) = diff(&left_array, &right_array) {
         println!("Delta: {:?}", delta);
+        let patched = patch(&left_array, delta).unwrap();
+        println!("Patched: {:?}", patched);
+        assert_eq!(patched, right_array);
     } else {
         println!("No differences found or diff not implemented yet");
     }
@@ -66,4 +82,25 @@ fn main() {
     println!("Original: {}", original);
     println!("Cloned:   {}", cloned);
     println!("Equal:    {}", original == cloned);
+
+    // test patch
+    let left = json!([1, 2, 3]);
+    let a = json!("a");
+    let b = json!("b");
+    // let c = json!("c");
+    let delta = Delta::Array(vec![
+        (ArrayDeltaIndex::NewOrModified(0), Delta::Added(&a)),
+        (ArrayDeltaIndex::RemovedOrMoved(1), Delta::Deleted(&b)),
+        (
+            ArrayDeltaIndex::RemovedOrMoved(0),
+            Delta::Moved {
+                new_index: 2,
+                moved_value: None,
+            },
+        ),
+    ]);
+
+    let patch = patch(&left, delta);
+    println!("Left: {:?}", left);
+    println!("Patch: {:?}", patch);
 }

@@ -12,7 +12,7 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TrivialDiffFilter {
     fn process(
         &self,
         context: &mut DiffContext<'a>,
-        new_children_context: &mut Vec<(String, DiffContext<'a>)>,
+        _new_children_context: &mut Vec<(String, DiffContext<'a>)>,
     ) {
         // This is a simplified implementation
         // In the full implementation, this would handle trivial cases like:
@@ -37,24 +37,5 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TrivialDiffFilter {
         {
             context.set_result(Delta::Modified(left, right)).exit();
         }
-
-        // if context.left.is_object() {
-        //     context.set_result(Delta::Object(context.left.clone())).exit();
-        // }
-
-        // For now, we'll just set a placeholder result
-        // context.set_result(Value::Null);
-    }
-
-    fn post_process(
-        &self,
-        context: &mut DiffContext<'a>,
-        new_children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
-        // Handle trivial post-process operations
-        // This would handle cases like:
-        // - Added deltas
-        // - Modified deltas
-        // - Deleted deltas
     }
 }

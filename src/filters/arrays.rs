@@ -286,9 +286,6 @@ impl<'a> Filter<PatchContext<'a>, Value> for ArraysPatchFilter {
         context: &mut PatchContext<'a>,
         new_children_context: &mut Vec<(String, PatchContext<'a>)>,
     ) {
-        if !context.nested {
-            return;
-        }
         let Delta::Array(array_delta) = &context.delta else {
             return;
         };
@@ -382,10 +379,6 @@ impl<'a> Filter<PatchContext<'a>, Value> for ArraysPatchFilter {
         context: &mut PatchContext<'a>,
         children_context: &mut Vec<(String, PatchContext<'a>)>,
     ) {
-        if !context.nested {
-            return;
-        }
-
         let Delta::Array(_) = &context.delta else {
             return;
         };
@@ -522,7 +515,6 @@ mod tests {
 
             let options = Rc::new(Options::default());
             let mut context = PatchContext::new(&test_case.original, test_case.delta, options);
-            context.nested = true;
 
             let mut new_children_context = Vec::new();
             ArraysPatchFilter.process(&mut context, &mut new_children_context);
@@ -584,7 +576,6 @@ mod tests {
 
             let options = Rc::new(Options::default());
             let mut context = PatchContext::new(&test_case.original, test_case.delta, options);
-            context.nested = true;
 
             let mut new_children_context = Vec::new();
             ArraysPatchFilter.process(&mut context, &mut new_children_context);

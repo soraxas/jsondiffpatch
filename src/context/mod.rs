@@ -1,5 +1,6 @@
 pub mod diff;
 pub mod patch;
+pub mod reverse;
 
 pub use diff::DiffContext;
 pub use patch::PatchContext;
@@ -35,6 +36,10 @@ where
 
     fn get_result(&self) -> Option<&Self::Result> {
         self.inner_data().result.as_ref()
+    }
+
+    fn get_result_mut(&mut self) -> Option<&mut Self::Result> {
+        self.inner_data_mut().result.as_mut()
     }
 
     fn exit(&mut self) -> &mut Self {

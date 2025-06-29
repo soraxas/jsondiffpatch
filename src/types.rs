@@ -52,6 +52,40 @@ pub enum ArrayDeltaIndex {
     RemovedOrMoved(usize), // index are the old index
 }
 
+impl PartialEq for ArrayDeltaIndex {
+    fn eq(&self, other: &Self) -> bool {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal) == std::cmp::Ordering::Equal
+    }
+}
+
+impl Eq for ArrayDeltaIndex {}
+
+impl PartialOrd for ArrayDeltaIndex {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        // if both are of the same type, compare by the index value
+        match (self, other) {
+            (ArrayDeltaIndex::NewOrModified(a), ArrayDeltaIndex::NewOrModified(b)) => {
+                Some(a.cmp(b))
+            }
+            (ArrayDeltaIndex::RemovedOrMoved(a), ArrayDeltaIndex::RemovedOrMoved(b)) => {
+                Some(a.cmp(b))
+            }
+            (ArrayDeltaIndex::RemovedOrMoved(_), ArrayDeltaIndex::NewOrModified(_)) => {
+                Some(std::cmp::Ordering::Less)
+            }
+            (ArrayDeltaIndex::NewOrModified(_), ArrayDeltaIndex::RemovedOrMoved(_)) => {
+                Some(std::cmp::Ordering::Greater)
+            }
+        }
+    }
+}
+
+impl Ord for ArrayDeltaIndex {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Delta<'a> {
     Added(&'a Value),

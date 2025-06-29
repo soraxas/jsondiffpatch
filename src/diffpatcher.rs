@@ -2,6 +2,7 @@ use crate::clone::clone;
 use crate::context::{DiffContext, FilterContext, PatchContext};
 use crate::filters::arrays::ArraysDiffFilter;
 use crate::filters::nested::{CollectionChildrenDiffFilter, ObjectsDiffFilter};
+use crate::filters::patch_pipeline::PatchPipeline;
 use crate::filters::texts::TextsDiffFilter;
 use crate::filters::TrivialDiffFilter;
 use crate::processor::{Pipe, Processor};
@@ -21,10 +22,7 @@ pub fn build_diff_pipe<'a>() -> Pipe<DiffContext<'a>, Delta<'a>> {
 
 pub fn build_patch_pipe<'a>() -> Pipe<PatchContext<'a>, Value> {
     Pipe::new("patch".to_string())
-        // .append(Box::new(TrivialDiffFilter))
-        // .append(Box::new(TextsDiffFilter))
-        // .append(Box::new(ObjectsDiffFilter))
-        // .append(Box::new(ArraysDiffFilter))
+        .append(Box::new(PatchPipeline))
         .should_have_result()
 }
 
@@ -83,10 +81,15 @@ impl DiffPatcher {
         context.get_result().cloned()
     }
 
-    pub fn patch(&self, _left: &Value, _delta: &Delta) -> Option<Value> {
+    pub fn patch(&self, _left: &Value, delta: Delta) -> Option<Value> {
         // Create a patch context
         // For now, return None as the implementation is simplified
-        None
+        let options = Rc::new(Options::default());
+        let mut context = PatchContext::new(_left, delta, options);
+        let mut patch_pipe = build_patch_pipe();
+        let processor = Processor::new(None);
+        processor.process(&mut context, &mut patch_pipe);
+        context.get_result().cloned()
     }
 
     pub fn reverse(&self, _delta: &Delta) -> Option<Delta> {
@@ -98,7 +101,7 @@ impl DiffPatcher {
     pub fn unpatch(&self, right: &Value, delta: &Delta) -> Option<Value> {
         // Unpatch is patch with reversed delta
         if let Some(reversed_delta) = self.reverse(delta) {
-            self.patch(right, &reversed_delta)
+            self.patch(right, reversed_delta)
         } else {
             None
         }

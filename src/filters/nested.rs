@@ -1,4 +1,4 @@
-use crate::context::{DiffContext, FilterContext};
+use crate::context::{DiffContext, FilterContext, PatchContext};
 use crate::processor::Filter;
 use crate::types::Delta;
 use serde_json::Value;
@@ -6,17 +6,15 @@ use std::collections::HashMap;
 
 pub struct CollectionChildrenDiffFilter;
 pub struct CollectionChildrenPatchFilter;
+pub struct CollectionChildrenReverseFilter;
+
+pub struct ObjectsDiffFilter;
+pub struct ObjectsPatchFilter;
+pub struct ObjectsReverseFilter;
 
 impl<'a> Filter<DiffContext<'a>, Delta<'a>> for CollectionChildrenDiffFilter {
     fn filter_name(&self) -> &str {
         "collection-children-diff"
-    }
-
-    fn process(
-        &self,
-        context: &mut DiffContext,
-        new_children_context: &mut Vec<(String, DiffContext)>,
-    ) {
     }
 
     fn post_process(
@@ -24,14 +22,6 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for CollectionChildrenDiffFilter {
         context: &mut DiffContext<'a>,
         children_context: &mut Vec<(String, DiffContext<'a>)>,
     ) {
-        // let mut context_mut = context.borrow_mut();
-        // This is a simplified implementation
-        // In the full implementation, this would handle trivial cases like:
-        // - Same values (no diff)
-        // - Different types
-        // - Null values
-        // - Primitive values
-
         let result: Delta<'a> = if context.left.is_object() {
             let mut result = HashMap::new();
 
@@ -66,8 +56,6 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for CollectionChildrenDiffFilter {
         context.set_result(result).exit();
     }
 }
-
-pub struct ObjectsDiffFilter;
 
 impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ObjectsDiffFilter {
     fn filter_name(&self) -> &str {
@@ -116,11 +104,17 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ObjectsDiffFilter {
 
         context.exit();
     }
+}
 
-    fn post_process(
+impl<'a> Filter<PatchContext<'a>, Value> for ObjectsPatchFilter {
+    fn filter_name(&self) -> &str {
+        "objects-patch"
+    }
+
+    fn process(
         &self,
-        context: &mut DiffContext,
-        new_children_context: &mut Vec<(String, DiffContext)>,
+        context: &mut PatchContext<'a>,
+        new_children_context: &mut Vec<(String, PatchContext<'a>)>,
     ) {
     }
 }

@@ -1,0 +1,205 @@
+use crate::context::{DiffContext, FilterContext, PatchContext};
+use crate::processor::Filter;
+use crate::types::{ArrayDeltaIndex, Delta};
+use diff_match_patch_rs::{DiffMatchPatch, Efficient};
+use lazy_static::lazy_static;
+use serde_json::Value;
+use std::collections::HashMap;
+
+pub struct PatchPipeline;
+
+lazy_static! {
+    static ref DMP: DiffMatchPatch = DiffMatchPatch::new();
+}
+
+impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
+    fn filter_name(&self) -> &str {
+        "patch-pipeline"
+    }
+
+    fn process(
+        &self,
+        context: &mut PatchContext<'a>,
+        new_children_context: &mut Vec<(String, PatchContext<'a>)>,
+    ) {
+        match &context.delta {
+            Delta::Object(object_delta) => {
+                for (key, value) in object_delta {
+                    let child = PatchContext::new(
+                        context.left.get(key).unwrap_or(&Value::Null),
+                        value.clone(),
+                        context.options().clone(),
+                    );
+                    new_children_context.push((key.to_string(), child));
+                }
+                context.exit();
+            }
+            Delta::Array(array_delta) => {
+                let mut container = vec![];
+                let result = handle_array(context.left, array_delta, &mut container);
+                // handle new children
+                for (name, value, delta) in container {
+                    let child_context = PatchContext::new(value, delta, context.options().clone());
+                    new_children_context.push((name, child_context));
+                }
+
+                context.set_result(result).exit();
+            }
+            Delta::Added(new_value) => {
+                context.set_result((*new_value).clone());
+            }
+            Delta::Deleted(_old_value) => {
+                // dont apply this value to the result to keep it as deleted
+            }
+            Delta::Modified(_from, to) => {
+                context.set_result((*to).clone());
+            }
+            Delta::Moved {
+                new_index: _,
+                moved_value: _,
+            } => {
+                unimplemented!("Should be handled by array directly, as move does not make sense for non-array container");
+            }
+            Delta::TextDiff(text_diff) => {
+                let Value::String(left_txt) = context.left else {
+                    panic!(
+                        "text diff is only supported for string values. Value: {:?}",
+                        context.left
+                    );
+                };
+                let left_txt = left_txt.as_str();
+                // context.set_result(text_diff.clone()).exit();
+                match DMP.patch_from_text::<Efficient>(text_diff) {
+                    Ok(patches) => {
+                        let (new_txt, ops) = DMP.patch_apply(&patches, left_txt).unwrap();
+                        ops.iter().for_each(|op| {
+                            println!("{}", if *op { "OK" } else { "FAIL" });
+                        });
+
+                        context.set_result(Value::String(new_txt)).exit();
+                    }
+                    Err(e) => {
+                        panic!("failed to apply text diff: {:#?}", e);
+                    }
+                }
+            }
+            Delta::None => {}
+        }
+    }
+
+    fn post_process(
+        &self,
+        context: &mut PatchContext<'a>,
+        children_context: &mut Vec<(String, PatchContext<'a>)>,
+    ) {
+        match &context.delta {
+            Delta::Array(_changes) => {
+                // Collect results from children and apply them to the array
+                let array_mut = context
+                    .get_result_mut()
+                    .expect("should be set during the main patch process")
+                    .as_array_mut()
+                    .unwrap();
+
+                for (index_str, child_context) in children_context {
+                    if let Some(child_result) = child_context.get_result() {
+                        if let Ok(index) = index_str.parse::<usize>() {
+                            if index < array_mut.len() {
+                                array_mut[index] = child_result.clone();
+                            }
+                        }
+                    }
+                }
+                // array is modified in-place.
+                // context.set_result(Value::Array(array)).exit();
+            }
+            Delta::Object(_changes) => {
+                let mut new_object = context.left.as_object().unwrap().clone();
+
+                // Collect results from children and apply them to the object
+                for (key, child_context) in children_context {
+                    if let Some(child_result) = child_context.get_result() {
+                        new_object.insert(key.clone(), child_result.clone());
+                    } else {
+                        new_object.remove(key);
+                    }
+                }
+
+                context.set_result(Value::Object(new_object)).exit();
+            }
+            _ => {}
+        }
+    }
+}
+
+fn handle_array<'a>(
+    left: &'a Value,
+    array_delta: &Vec<(ArrayDeltaIndex, Delta<'a>)>,
+    return_container: &mut Vec<(String, &'a Value, Delta<'a>)>,
+) -> Value {
+    let ori_array = left.as_array().unwrap();
+    let mut new_array = ori_array.clone();
+
+    let mut to_insert: Vec<(usize, Value)> = Vec::new();
+
+    // create a vector of references to the array delta, but with the indices sorted
+    let mut sorted_array_delta = array_delta
+        .iter()
+        .map(|(index, delta)| (index, delta))
+        .collect::<Vec<_>>();
+
+    // Remove items, in reverse order to avoid index shifting issues
+    sorted_array_delta.sort_by_key(|(index, _)| *index);
+
+    for (index, delta) in sorted_array_delta.iter().rev() {
+        match index {
+            ArrayDeltaIndex::RemovedOrMoved(removed_index) => {
+                // Check if it's a removal or move
+                if *removed_index >= new_array.len() {
+                    panic!("index out of bounds: the patch is trying to remove an item at index {}, but the array has only {} items", removed_index, new_array.len());
+                }
+
+                // Check if this was a move operation
+                let removed_value = new_array.remove(*removed_index);
+                match delta {
+                    Delta::Deleted(_) => {
+                        // to_remove.push((*removed_index, None));
+                    }
+                    Delta::Moved { new_index, .. } => {
+                        // We'll handle the reinsertion later, as we want to insert in increasing order
+                        to_insert.push((*new_index, removed_value));
+                    }
+                    _ => {
+                        panic!("only removal or move can be applied at original array indices");
+                    }
+                }
+            }
+            ArrayDeltaIndex::NewOrModified(new_index) => {
+                match delta {
+                    Delta::Added(value) => {
+                        to_insert.push((*new_index, (*value).clone()));
+                    }
+                    Delta::Modified(_from, _to) => {
+                        // Modified item - will be handled by child contexts
+                        let value = &ori_array[*new_index];
+                        return_container.push((new_index.to_string(), value, (*delta).clone()));
+                    }
+                    _ => {
+                        panic!("only addition or modification can be applied at new array indices");
+                    }
+                }
+            }
+        }
+    }
+
+    // Insert items, sorted by index
+    to_insert.sort_by_key(|(index, _)| *index);
+    for (index, value) in to_insert {
+        if index > new_array.len() {
+            panic!("index out of bounds: the patch is trying to insert an item at index {}, but the array has only {} items", index, new_array.len());
+        }
+        new_array.insert(index, value);
+    }
+
+    Value::Array(new_array)
+}

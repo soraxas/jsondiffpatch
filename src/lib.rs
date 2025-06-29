@@ -24,7 +24,7 @@ pub fn diff<'a>(left: &'a serde_json::Value, right: &'a serde_json::Value) -> Op
     instance.diff(left, right)
 }
 
-pub fn patch(left: &serde_json::Value, delta: &Delta) -> Option<serde_json::Value> {
+pub fn patch(left: &serde_json::Value, delta: Delta) -> Option<serde_json::Value> {
     let instance = DEFAULT_INSTANCE.get_or_init(|| DiffPatcher::new(None));
     instance.patch(left, delta)
 }
