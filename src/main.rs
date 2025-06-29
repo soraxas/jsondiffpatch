@@ -99,7 +99,9 @@ fn main() {
         ),
     ]);
 
-    let patch = patch(&left, delta);
+    let patch = patch(&left, delta.clone());
     println!("Left: {:?}", left);
     println!("Patch: {:?}", patch);
+
+    println!("{}", serde_json::to_string(&delta).unwrap());
 }

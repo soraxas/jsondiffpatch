@@ -2,11 +2,15 @@ use crate::errors::JsonDiffPatchReverseError;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 use std::fmt;
 
-const MIDDLE_NO_VALUE: u32 = 0;
+// const MIDDLE_NO_VALUE: u32 = 0;
+const MIDDLE_NO_VALUE: Value = Value::Null;
 
+#[derive(Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
 pub enum MagicNumber {
     Deleted = 0,
     UndefinedDiff = 2,
@@ -79,6 +83,22 @@ impl ArrayDeltaIndex {
     }
 }
 
+impl Serialize for ArrayDeltaIndex {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            ArrayDeltaIndex::NewOrModified(index) => {
+                serializer.serialize_str(&format!("{}", index))
+            }
+            ArrayDeltaIndex::RemovedOrMoved(index) => {
+                serializer.serialize_str(&format!("_{}", index))
+            }
+        }
+    }
+}
+
 impl PartialEq for ArrayDeltaIndex {
     fn eq(&self, other: &Self) -> bool {
         self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal) == std::cmp::Ordering::Equal
@@ -132,7 +152,7 @@ impl<'a> Delta<'a> {
             }
             Delta::Deleted(deleted) => Value::Array(vec![
                 deleted.clone(),
-                MIDDLE_NO_VALUE.into(),
+                MIDDLE_NO_VALUE,
                 MagicNumber::Deleted.into(),
             ]),
             Delta::Object(value) => Value::Object(
@@ -160,7 +180,7 @@ impl<'a> Delta<'a> {
             ]),
             Delta::TextDiff(uni_diff) => Value::Array(vec![
                 uni_diff.into(),
-                MIDDLE_NO_VALUE.into(),
+                MIDDLE_NO_VALUE,
                 MagicNumber::UndefinedDiff.into(),
             ]),
             Delta::None => {
@@ -193,6 +213,72 @@ impl<'a> Delta<'a> {
             }
             Delta::Array(array) => {
                 todo!()
+            }
+        }
+    }
+}
+
+impl Serialize for Delta<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::{SerializeMap, SerializeSeq};
+
+        match self {
+            Delta::Added(new_value) => {
+                let mut seq = serializer.serialize_seq(Some(1))?;
+                seq.serialize_element(new_value)?;
+                seq.end()
+            }
+            Delta::Modified(old_value, new_value) => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(old_value)?;
+                seq.serialize_element(new_value)?;
+                seq.end()
+            }
+            Delta::Deleted(deleted) => {
+                let mut seq = serializer.serialize_seq(Some(3))?;
+                seq.serialize_element(deleted)?;
+                seq.serialize_element(&MIDDLE_NO_VALUE)?;
+                seq.serialize_element(&MagicNumber::Deleted)?;
+                seq.end()
+            }
+            Delta::Object(value) => {
+                let mut map = serializer.serialize_map(Some(value.len()))?;
+                for (k, v) in value {
+                    map.serialize_entry(k, v)?;
+                }
+                map.end()
+            }
+            Delta::Array(array_changes) => {
+                let mut map = serializer.serialize_map(Some(array_changes.len() + 1))?;
+                map.serialize_entry("_t", &Value::String("a".to_string()))?;
+                for (index, delta) in array_changes {
+                    map.serialize_entry(index, delta)?;
+                }
+                map.end()
+            }
+            Delta::Moved {
+                moved_value,
+                new_index,
+            } => {
+                let mut seq = serializer.serialize_seq(Some(3))?;
+                seq.serialize_element(moved_value.unwrap_or(&Value::Null))?;
+                seq.serialize_element(new_index)?;
+                seq.serialize_element(&MagicNumber::ArrayMoved)?;
+                seq.end()
+            }
+            Delta::TextDiff(uni_diff) => {
+                let mut seq = serializer.serialize_seq(Some(3))?;
+                seq.serialize_element(uni_diff)?;
+                seq.serialize_element(&MIDDLE_NO_VALUE)?;
+                seq.serialize_element(&MagicNumber::UndefinedDiff)?;
+                seq.end()
+            }
+            Delta::None => {
+                panic!("Delta::None is not serializable");
+                // Value::Null
             }
         }
     }
