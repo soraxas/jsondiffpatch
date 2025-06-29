@@ -3,9 +3,9 @@ use crate::types::Options;
 
 pub trait Filter<C, TResult> {
     fn filter_name(&self) -> &str;
-    fn process(&self, context: &mut C, new_children_context: &mut Vec<(String, C)>);
+    fn process(&self, _context: &mut C, _new_children_context: &mut Vec<(String, C)>) {}
 
-    fn post_process(&self, context: &mut C, new_children_context: &mut Vec<(String, C)>);
+    fn post_process(&self, _context: &mut C, _new_children_context: &mut Vec<(String, C)>) {}
 }
 
 pub struct Pipe<C: FilterContext, TResult> {

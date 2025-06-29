@@ -8,7 +8,7 @@ pub struct PatchContext<'a> {
     context_data: ContextData<Self>,
     pub left: &'a Value,
     pub delta: Delta<'a>,
-    nested: bool,
+    pub nested: bool,
 }
 
 impl<'a> FilterContext for PatchContext<'a> {

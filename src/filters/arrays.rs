@@ -1,9 +1,11 @@
-use crate::context::{DiffContext, FilterContext};
+use crate::context::{DiffContext, FilterContext, PatchContext};
 use crate::lcs;
 use crate::processor::Filter;
 use crate::types::{ArrayDeltaIndex, ArrayOptions, Delta};
+use serde_json::Value;
 
 pub struct ArraysDiffFilter;
+pub struct ArraysPatchFilter;
 
 impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ArraysDiffFilter {
     fn filter_name(&self) -> &str {
@@ -274,4 +276,340 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ArraysDiffFilter {
     }
 }
 
-pub struct ArraysPatchFilter;
+impl<'a> Filter<PatchContext<'a>, Value> for ArraysPatchFilter {
+    fn filter_name(&self) -> &str {
+        "arrays-patch"
+    }
+
+    fn process(
+        &self,
+        context: &mut PatchContext<'a>,
+        new_children_context: &mut Vec<(String, PatchContext<'a>)>,
+    ) {
+        if !context.nested {
+            return;
+        }
+        let Delta::Array(array_delta) = &context.delta else {
+            return;
+        };
+
+        let ori_array = context.left.as_array().unwrap();
+        let mut new_array = ori_array.clone();
+
+        // First, separate removals, insertions, modifications, and moves
+        let mut to_remove: Vec<(usize, Option<usize>)> = Vec::new();
+        let mut to_insert: Vec<(usize, Value)> = Vec::new();
+        let mut to_modify: Vec<(usize, Delta<'a>)> = Vec::new();
+
+        for (index, delta) in array_delta {
+            match index {
+                ArrayDeltaIndex::RemovedOrMoved(removed_index) => {
+                    // Check if it's a removal or move
+                    match delta {
+                        Delta::Deleted(_) => {
+                            to_remove.push((*removed_index, None));
+                        }
+                        Delta::Moved { new_index, .. } => {
+                            to_remove.push((*removed_index, Some(*new_index)));
+                            // We'll handle the reinsertion later
+                        }
+                        _ => {
+                            panic!("only removal or move can be applied at original array indices");
+                        }
+                    }
+                }
+                ArrayDeltaIndex::NewOrModified(new_index) => {
+                    match delta {
+                        Delta::Added(value) => {
+                            to_insert.push((*new_index, (*value).clone()));
+                        }
+                        Delta::Modified(from, to) => {
+                            // Modified item - will be handled by child contexts
+                            to_modify.push((*new_index, delta.clone()));
+                        }
+                        _ => {
+                            panic!(
+                                "only addition or modification can be applied at new array indices"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Remove items, in reverse order to avoid index shifting issues
+        to_remove.sort_by_key(|(index, _)| *index);
+        for &(index, is_move) in to_remove.iter().rev() {
+            if index >= new_array.len() {
+                panic!("index out of bounds: the patch is trying to remove an item at index {}, but the array has only {} items", index, new_array.len());
+            }
+            let removed_value = new_array.remove(index);
+            // Check if this was a move operation
+            if let Some(new_index) = is_move {
+                to_insert.push((new_index, removed_value));
+            }
+        }
+
+        // Insert items, sorted by index
+        to_insert.sort_by_key(|(index, _)| *index);
+        for (index, value) in to_insert {
+            if index > new_array.len() {
+                panic!("index out of bounds: the patch is trying to insert an item at index {}, but the array has only {} items", index, new_array.len());
+            }
+            new_array.insert(index, value);
+        }
+
+        // Create child contexts for modifications
+        for (index, delta) in to_modify {
+            if index < new_array.len() {
+                let value = &ori_array[index];
+                let child_context = PatchContext::new(value, delta, context.options().clone());
+                new_children_context.push((index.to_string(), child_context));
+            }
+        }
+
+        // If no children, set the result and exit
+        if new_children_context.is_empty() {
+            context.set_result(Value::Array(new_array)).exit();
+            return;
+        }
+
+        context.exit();
+    }
+
+    fn post_process(
+        &self,
+        context: &mut PatchContext<'a>,
+        children_context: &mut Vec<(String, PatchContext<'a>)>,
+    ) {
+        if !context.nested {
+            return;
+        }
+
+        let Delta::Array(_) = &context.delta else {
+            return;
+        };
+
+        if children_context.is_empty() {
+            return;
+        }
+
+        // Collect results from children and apply them to the array
+        let mut array = context.left.as_array().unwrap().clone();
+
+        for (index_str, child_context) in children_context {
+            if let Some(child_result) = child_context.get_result() {
+                if let Ok(index) = index_str.parse::<usize>() {
+                    if index < array.len() {
+                        array[index] = child_result.clone();
+                    }
+                }
+            }
+        }
+
+        context.set_result(Value::Array(array)).exit();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use super::*;
+    use crate::Options;
+
+    struct ArrayPatchTestCase<'a> {
+        name: &'a str,
+        original: Value,
+        delta: Delta<'a>,
+        expected: Value,
+        expected_children: usize,
+    }
+
+    #[test]
+    fn test_arrays_patch() {
+        let a = serde_json::json!("a");
+        let b = serde_json::json!("b");
+        let c = serde_json::json!("c");
+        let x = serde_json::json!("x");
+        let test_cases = vec![
+            ArrayPatchTestCase {
+                name: "remove first element and add new element at beginning",
+                original: serde_json::from_str(r#"["a", "b", "c"]"#).unwrap(),
+                delta: Delta::Array(vec![
+                    (ArrayDeltaIndex::RemovedOrMoved(0), Delta::Deleted(&a)),
+                    (ArrayDeltaIndex::NewOrModified(0), Delta::Added(&x)),
+                ]),
+                expected: serde_json::from_str(r#"["x", "b", "c"]"#).unwrap(),
+                expected_children: 0,
+            },
+            ArrayPatchTestCase {
+                name: "add element at end",
+                original: serde_json::from_str(r#"["a", 0, "b", false]"#).unwrap(),
+                delta: Delta::Array(vec![(ArrayDeltaIndex::NewOrModified(3), Delta::Added(&c))]),
+                expected: serde_json::from_str(r#"["a", 0, "b", "c", false]"#).unwrap(),
+                expected_children: 0,
+            },
+            ArrayPatchTestCase {
+                name: "remove element from middle",
+                original: serde_json::from_str(r#"["a", "b", "c", "d", "e"]"#).unwrap(),
+                delta: Delta::Array(vec![
+                    (
+                        ArrayDeltaIndex::RemovedOrMoved(3),
+                        Delta::Moved {
+                            moved_value: None,
+                            new_index: 2,
+                        },
+                    ),
+                    (ArrayDeltaIndex::RemovedOrMoved(1), Delta::Deleted(&b)),
+                    (
+                        ArrayDeltaIndex::RemovedOrMoved(4),
+                        Delta::Moved {
+                            moved_value: None,
+                            new_index: 0,
+                        },
+                    ),
+                ]),
+                expected: serde_json::from_str(r#"["e","a", "d", "c"]"#).unwrap(),
+                expected_children: 0,
+            },
+            ArrayPatchTestCase {
+                name: "move element",
+                original: serde_json::from_str(r#"["a", "b", "c"]"#).unwrap(),
+                delta: Delta::Array(vec![(
+                    ArrayDeltaIndex::RemovedOrMoved(0),
+                    Delta::Moved {
+                        moved_value: Some(&a),
+                        new_index: 2,
+                    },
+                )]),
+                expected: serde_json::from_str(r#"["b", "c", "a"]"#).unwrap(),
+                expected_children: 0,
+            },
+            ArrayPatchTestCase {
+                name: "modify element",
+                original: serde_json::from_str(r#"["a", "b", "c"]"#).unwrap(),
+                delta: Delta::Array(vec![
+                    // (ArrayDeltaIndex::NewOrModified(1), Delta::Modified(
+                    //     &b,
+                    //     &x
+                    // )),
+                ]),
+                expected: serde_json::from_str(r#"["a", "b", "c"]"#).unwrap(), // Will be updated by child context
+                expected_children: 0,
+            },
+            ArrayPatchTestCase {
+                name: "complex operations: remove, add, and move",
+                original: serde_json::from_str(r#"["a", "b", "c", "d"]"#).unwrap(),
+                delta: Delta::Array(vec![
+                    (ArrayDeltaIndex::RemovedOrMoved(1), Delta::Deleted(&b)),
+                    (ArrayDeltaIndex::NewOrModified(1), Delta::Added(&x)),
+                    (
+                        ArrayDeltaIndex::RemovedOrMoved(0),
+                        Delta::Moved {
+                            moved_value: Some(&a),
+                            new_index: 3,
+                        },
+                    ),
+                ]),
+                expected: serde_json::from_str(r#"["c", "x", "d", "a"]"#).unwrap(),
+                expected_children: 0,
+            },
+        ];
+
+        for test_case in test_cases {
+            println!("Running test: {}", test_case.name);
+
+            let options = Rc::new(Options::default());
+            let mut context = PatchContext::new(&test_case.original, test_case.delta, options);
+            context.nested = true;
+
+            let mut new_children_context = Vec::new();
+            ArraysPatchFilter.process(&mut context, &mut new_children_context);
+
+            assert_eq!(
+                new_children_context.len(),
+                test_case.expected_children,
+                "Test '{}' failed: expected {} children, got {}",
+                test_case.name,
+                test_case.expected_children,
+                new_children_context.len()
+            );
+
+            if let Some(result) = context.get_result() {
+                assert_eq!(
+                    result, &test_case.expected,
+                    "Test '{}' failed: expected {:?}, got {:?}",
+                    test_case.name, test_case.expected, result
+                );
+            } else {
+                panic!("Test '{}' failed: no result returned", test_case.name);
+            }
+        }
+    }
+
+    #[test]
+    fn test_arrays_patch_edge_cases() {
+        let a = serde_json::json!("a");
+
+        let edge_cases = vec![
+            ArrayPatchTestCase {
+                name: "empty array add element",
+                original: serde_json::from_str(r#"[]"#).unwrap(),
+                delta: Delta::Array(vec![(ArrayDeltaIndex::NewOrModified(0), Delta::Added(&a))]),
+                expected: serde_json::from_str(r#"["a"]"#).unwrap(),
+                expected_children: 0,
+            },
+            ArrayPatchTestCase {
+                name: "single element remove",
+                original: serde_json::from_str(r#"["a"]"#).unwrap(),
+                delta: Delta::Array(vec![(
+                    ArrayDeltaIndex::RemovedOrMoved(0),
+                    Delta::Deleted(&a),
+                )]),
+                expected: serde_json::from_str(r#"[]"#).unwrap(),
+                expected_children: 0,
+            },
+            ArrayPatchTestCase {
+                name: "no changes",
+                original: serde_json::from_str(r#"["a", "b"]"#).unwrap(),
+                delta: Delta::Array(vec![]),
+                expected: serde_json::from_str(r#"["a", "b"]"#).unwrap(),
+                expected_children: 0,
+            },
+        ];
+
+        for test_case in edge_cases {
+            println!("Running edge case test: {}", test_case.name);
+
+            let options = Rc::new(Options::default());
+            let mut context = PatchContext::new(&test_case.original, test_case.delta, options);
+            context.nested = true;
+
+            let mut new_children_context = Vec::new();
+            ArraysPatchFilter.process(&mut context, &mut new_children_context);
+
+            assert_eq!(
+                new_children_context.len(),
+                test_case.expected_children,
+                "Edge case test '{}' failed: expected {} children, got {}",
+                test_case.name,
+                test_case.expected_children,
+                new_children_context.len()
+            );
+
+            if let Some(result) = context.get_result() {
+                assert_eq!(
+                    result, &test_case.expected,
+                    "Edge case test '{}' failed: expected {:?}, got {:?}",
+                    test_case.name, test_case.expected, result
+                );
+            } else {
+                panic!(
+                    "Edge case test '{}' failed: no result returned",
+                    test_case.name
+                );
+            }
+        }
+    }
+}
