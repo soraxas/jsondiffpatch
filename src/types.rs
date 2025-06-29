@@ -1,3 +1,4 @@
+use crate::errors::JsonDiffPatchReverseError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -146,6 +147,33 @@ impl<'a> Delta<'a> {
             Delta::None => {
                 panic!("Delta::None is not serializable");
                 // Value::Null
+            }
+        }
+    }
+
+    /// Reverses the delta
+    pub fn build_reverse(self) -> Result<Delta<'a>, JsonDiffPatchReverseError> {
+        match self {
+            Delta::Added(new_value) => Ok(Delta::Deleted(new_value)),
+            Delta::Modified(old_value, new_value) => Ok(Delta::Modified(new_value, old_value)),
+            Delta::Deleted(deleted) => Ok(Delta::Added(deleted)),
+            Delta::Object(object) => {
+                let mut reversed_changes = HashMap::new();
+                for (key, value) in object {
+                    reversed_changes.insert(key, value.build_reverse()?);
+                }
+                Ok(Delta::Object(reversed_changes))
+            }
+            Delta::None => Ok(Delta::None),
+            Delta::Moved {
+                moved_value: _,
+                new_index: _,
+            } => Err(JsonDiffPatchReverseError::InvalidMoveDelta),
+            Delta::TextDiff(uni_diff) => {
+                todo!()
+            }
+            Delta::Array(array) => {
+                todo!()
             }
         }
     }

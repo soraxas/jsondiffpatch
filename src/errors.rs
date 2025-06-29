@@ -34,3 +34,9 @@ impl From<DiffMatchPatchError> for JsonDiffPatchError {
         JsonDiffPatchError::ApplyTextDiffFailed(err)
     }
 }
+
+#[derive(Error, Debug)]
+pub enum JsonDiffPatchReverseError {
+    #[error("The given move delta cannot be reversed. Needs to be handled by the higher level array directly.")]
+    InvalidMoveDelta,
+}
