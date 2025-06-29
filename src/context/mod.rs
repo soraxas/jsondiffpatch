@@ -1,36 +1,72 @@
 pub mod diff;
+pub mod patch;
 
 pub use diff::DiffContext;
+pub use patch::PatchContext;
 
 use crate::types::Options;
-use serde_json::Value;
+use std::rc::Rc;
 
-pub trait FilterContext {
+/// A trait that defines the interface for filter contexts.
+///
+/// Filter contexts are used to store the result of a filter and to track the state of the filter.
+pub trait FilterContext
+where
+    Self: Sized,
+{
     type Result;
 
-    fn set_result(&mut self, result: Self::Result) -> &mut Self;
-    fn get_result(&self) -> Option<&Self::Result>;
-    fn exit(&mut self) -> &mut Self;
-    fn is_exiting(&self) -> bool;
+    /// a filter that can be used to skip setting the result
+    fn skip_set_result_filter(&mut self, _result: &Self::Result) -> bool {
+        false
+    }
 
-    fn inner_data(&mut self) -> &mut ContextData<Self>
+    fn set_result(&mut self, result: Self::Result) -> &mut Self
     where
-        Self: Sized;
+        Self::Result: std::fmt::Debug,
+    {
+        if self.skip_set_result_filter(&result) {
+            return self;
+        }
+        log::trace!("set_result: {:?}", result);
+        self.inner_data_mut().set_result(result);
+        self
+    }
+
+    fn get_result(&self) -> Option<&Self::Result> {
+        self.inner_data().result.as_ref()
+    }
+
+    fn exit(&mut self) -> &mut Self {
+        self.inner_data_mut().exit();
+        self
+    }
+
+    fn is_exiting(&self) -> bool {
+        self.inner_data().is_exiting()
+    }
+
+    fn options(&self) -> &Rc<Options> {
+        &self.inner_data().options
+    }
+
+    fn inner_data(&self) -> &ContextData<Self>;
+    fn inner_data_mut(&mut self) -> &mut ContextData<Self>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ContextData<FC: FilterContext> {
     result: Option<FC::Result>,
     exiting: bool,
-    pub options: Option<Options>,
+    pub options: Rc<Options>,
 }
 
 impl<FC: FilterContext> ContextData<FC> {
-    pub fn new() -> Self {
+    pub fn new(options: Rc<Options>) -> Self {
         Self {
             result: None,
             exiting: false,
-            options: None,
+            options,
         }
     }
 

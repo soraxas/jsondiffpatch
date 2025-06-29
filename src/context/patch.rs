@@ -4,19 +4,15 @@ use serde_json::Value;
 use std::rc::Rc;
 
 #[derive(Debug)]
-pub struct DiffContext<'a> {
+pub struct PatchContext<'a> {
     context_data: ContextData<Self>,
     pub left: &'a Value,
-    pub right: &'a Value,
+    pub delta: Delta<'a>,
+    nested: bool,
 }
 
-impl<'a> FilterContext for DiffContext<'a> {
-    type Result = Delta<'a>;
-
-    fn skip_set_result_filter(&mut self, result: &Self::Result) -> bool {
-        // if the result is None, skip setting the result
-        matches!(result, Delta::None)
-    }
+impl<'a> FilterContext for PatchContext<'a> {
+    type Result = Value;
 
     fn inner_data(&self) -> &ContextData<Self> {
         &self.context_data
@@ -27,11 +23,12 @@ impl<'a> FilterContext for DiffContext<'a> {
     }
 }
 
-impl<'a> DiffContext<'a> {
-    pub fn new(left: &'a Value, right: &'a Value, options: Rc<Options>) -> Self {
+impl<'a> PatchContext<'a> {
+    pub fn new(left: &'a Value, delta: Delta<'a>, options: Rc<Options>) -> Self {
         Self {
             left,
-            right,
+            delta,
+            nested: false,
             context_data: ContextData::new(options),
         }
     }

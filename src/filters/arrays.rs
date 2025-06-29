@@ -62,8 +62,11 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ArraysDiffFilter {
             && common_head < len2
             && left_array[common_head] == right_array[common_head]
         {
-            let child_context =
-                DiffContext::new(&left_array[common_head], &right_array[common_head]);
+            let child_context = DiffContext::new(
+                &left_array[common_head],
+                &right_array[common_head],
+                context.options().clone(),
+            );
             new_children_context.push((common_head.to_string(), child_context));
             common_head += 1;
         }
@@ -76,7 +79,11 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ArraysDiffFilter {
         {
             let index1 = len1 - 1 - common_tail;
             let index2 = len2 - 1 - common_tail;
-            let child_context = DiffContext::new(&left_array[index1], &right_array[index2]);
+            let child_context = DiffContext::new(
+                &left_array[index1],
+                &right_array[index2],
+                context.options().clone(),
+            );
             new_children_context.push((index2.to_string(), child_context));
             common_tail += 1;
         }
@@ -135,13 +142,13 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ArraysDiffFilter {
 
         // Check for move detection
         let detect_move = context
-            .options
+            .options()
             .arrays
             .as_ref()
             .and_then(|opts| opts.detect_move)
             .unwrap_or(true);
         let include_value_on_move = context
-            .options
+            .options()
             .arrays
             .as_ref()
             .and_then(|opts| opts.include_value_on_move)
@@ -189,6 +196,7 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ArraysDiffFilter {
                             let child_context = DiffContext::new(
                                 &left_array[removed_index],
                                 &right_array[original_index2],
+                                context.options().clone(),
                             );
                             new_children_context.push((original_index2.to_string(), child_context));
 
@@ -217,6 +225,7 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ArraysDiffFilter {
                     let child_context = DiffContext::new(
                         &left_array[original_index1],
                         &right_array[original_index2],
+                        context.options().clone(),
                     );
                     new_children_context.push((original_index2.to_string(), child_context));
                 }

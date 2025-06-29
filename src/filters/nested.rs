@@ -92,13 +92,20 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ObjectsDiffFilter {
         for (key, value) in left {
             new_children_context.push((
                 key.to_string(),
-                DiffContext::new(value, right.get(key).unwrap_or(&Value::Null)),
+                DiffContext::new(
+                    value,
+                    right.get(key).unwrap_or(&Value::Null),
+                    context.options().clone(),
+                ),
             ));
         }
 
         for (key, value) in right {
             if !left.contains_key(key) {
-                new_children_context.push((key.to_string(), DiffContext::new(&Value::Null, value)));
+                new_children_context.push((
+                    key.to_string(),
+                    DiffContext::new(&Value::Null, value, context.options().clone()),
+                ));
             }
         }
 

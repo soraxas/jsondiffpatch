@@ -76,7 +76,7 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TextsDiffFilter {
 
         // Get minimum length from options or use default
         let min_length = context
-            .options
+            .options()
             .text_diff
             .as_ref()
             .and_then(|td| td.min_length)

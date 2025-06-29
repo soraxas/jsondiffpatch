@@ -105,21 +105,6 @@ impl Processor {
         // context.set_options(self.options.clone());
 
         // Create a simplified options clone without function pointers
-        let simplified_options = Options {
-            // object_hash: None, // Cannot clone function pointers
-            match_by_position: self.options.match_by_position,
-            arrays: self.options.arrays.clone(),
-            text_diff: self.options.text_diff.clone(),
-            // property_filter: None, // Cannot clone function pointers
-            clone_diff_values: self.options.clone_diff_values,
-            omit_removed_values: self.options.omit_removed_values,
-        };
-
-        // context.set_options(simplified_options);
-        let context = context;
-        let inner_data = context.inner_data();
-        inner_data.options = Some(self.options.clone());
-
         // let pipe_name = context.pipe();
 
         // let mut last_pipe = None;

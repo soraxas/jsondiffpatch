@@ -1,5 +1,5 @@
 use crate::clone::clone;
-use crate::context::DiffContext;
+use crate::context::{DiffContext, FilterContext, PatchContext};
 use crate::filters::arrays::ArraysDiffFilter;
 use crate::filters::nested::{CollectionChildrenDiffFilter, ObjectsDiffFilter};
 use crate::filters::texts::TextsDiffFilter;
@@ -7,6 +7,7 @@ use crate::filters::TrivialDiffFilter;
 use crate::processor::{Pipe, Processor};
 use crate::types::{Delta, Options};
 use serde_json::Value;
+use std::rc::Rc;
 
 pub fn build_diff_pipe<'a>() -> Pipe<DiffContext<'a>, Delta<'a>> {
     Pipe::new("diff".to_string())
@@ -17,14 +18,22 @@ pub fn build_diff_pipe<'a>() -> Pipe<DiffContext<'a>, Delta<'a>> {
         .append(Box::new(ArraysDiffFilter))
         .should_have_result()
 }
+
+pub fn build_patch_pipe<'a>() -> Pipe<PatchContext<'a>, Value> {
+    Pipe::new("patch".to_string())
+        // .append(Box::new(TrivialDiffFilter))
+        // .append(Box::new(TextsDiffFilter))
+        // .append(Box::new(ObjectsDiffFilter))
+        // .append(Box::new(ArraysDiffFilter))
+        .should_have_result()
+}
+
 pub struct DiffPatcher {
     // processor: Processor,
 }
 
 impl DiffPatcher {
     pub fn new(options: Option<Options>) -> Self {
-
-
         // // Set up patch pipe
         // let patch_pipe = Pipe::new("patch".to_string())
         //     .append(create_trivial_filters())
@@ -62,15 +71,14 @@ impl DiffPatcher {
 
     pub fn diff<'a>(&self, left: &'a Value, right: &'a Value) -> Option<Delta<'a>> {
         // Create a diff context
-        let mut context = DiffContext::new(left, right);
+
+        let options = Rc::new(Options::default());
+
+        let mut context = DiffContext::new(left, right, options);
         let mut diff_pipe = build_diff_pipe();
 
         let processor = Processor::new(None);
         processor.process(&mut context, &mut diff_pipe);
-
-        // if let Some(res) = context.get_result() {
-        //     println!(">> {}", res.clone().to_serializable().to_string());
-        // }
 
         context.get_result().cloned()
     }
