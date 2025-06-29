@@ -3,7 +3,6 @@ use jsondiffpatch_rs::{
     types::{ArrayDeltaIndex, Delta},
 };
 use serde_json::json;
-use std::collections::HashMap;
 
 fn main() {
     env_logger::init();

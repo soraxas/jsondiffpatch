@@ -1,11 +1,23 @@
 use crate::context::FilterContext;
+use crate::errors::JsonDiffPatchError;
 use crate::types::Options;
 
 pub trait Filter<C, TResult> {
     fn filter_name(&self) -> &str;
-    fn process(&self, _context: &mut C, _new_children_context: &mut Vec<(String, C)>) {}
-
-    fn post_process(&self, _context: &mut C, _new_children_context: &mut Vec<(String, C)>) {}
+    fn process(
+        &self,
+        _context: &mut C,
+        _new_children_context: &mut Vec<(String, C)>,
+    ) -> Result<(), JsonDiffPatchError> {
+        Ok(())
+    }
+    fn post_process(
+        &self,
+        _context: &mut C,
+        _new_children_context: &mut Vec<(String, C)>,
+    ) -> Result<(), JsonDiffPatchError> {
+        Ok(())
+    }
 }
 
 pub struct Pipe<C: FilterContext, TResult> {

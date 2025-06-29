@@ -1,4 +1,5 @@
 use crate::context::{DiffContext, FilterContext};
+use crate::errors::JsonDiffPatchError;
 use crate::processor::Filter;
 use crate::types::Delta;
 
@@ -13,7 +14,7 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TrivialDiffFilter {
         &self,
         context: &mut DiffContext<'a>,
         _new_children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
+    ) -> Result<(), JsonDiffPatchError> {
         // This is a simplified implementation
         // In the full implementation, this would handle trivial cases like:
         // - Same values (no diff)
@@ -37,5 +38,6 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TrivialDiffFilter {
         {
             context.set_result(Delta::Modified(left, right)).exit();
         }
+        Ok(())
     }
 }

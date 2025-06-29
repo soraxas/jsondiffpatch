@@ -1,10 +1,10 @@
-use crate::context::{DiffContext, FilterContext, PatchContext};
+use crate::context::{FilterContext, PatchContext};
+use crate::errors::JsonDiffPatchError;
 use crate::processor::Filter;
 use crate::types::{ArrayDeltaIndex, Delta};
 use diff_match_patch_rs::{DiffMatchPatch, Efficient};
 use lazy_static::lazy_static;
 use serde_json::Value;
-use std::collections::HashMap;
 
 pub struct PatchPipeline;
 
@@ -21,7 +21,7 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
         &self,
         context: &mut PatchContext<'a>,
         new_children_context: &mut Vec<(String, PatchContext<'a>)>,
-    ) {
+    ) -> Result<(), JsonDiffPatchError> {
         match &context.delta {
             Delta::Object(object_delta) => {
                 for (key, value) in object_delta {
@@ -36,7 +36,15 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
             }
             Delta::Array(array_delta) => {
                 let mut container = vec![];
-                let result = handle_array(context.left, array_delta, &mut container);
+                let result = handle_array(
+                    context.left.as_array().ok_or_else(|| {
+                        JsonDiffPatchError::InvalidPatchToTarget {
+                            patch: "array".to_string(),
+                        }
+                    })?,
+                    array_delta,
+                    &mut container,
+                )?;
                 // handle new children
                 for (name, value, delta) in container {
                     let child_context = PatchContext::new(value, delta, context.options().clone());
@@ -58,20 +66,21 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
                 new_index: _,
                 moved_value: _,
             } => {
-                unimplemented!("Should be handled by array directly, as move does not make sense for non-array container");
+                return Err(JsonDiffPatchError::InternalPatchLogicError(
+                    "Should be handled by array directly, as move does not make sense for non-array container".to_string(),
+                ));
             }
             Delta::TextDiff(text_diff) => {
                 let Value::String(left_txt) = context.left else {
-                    panic!(
-                        "text diff is only supported for string values. Value: {:?}",
-                        context.left
-                    );
+                    return Err(JsonDiffPatchError::InvalidPatchToTarget {
+                        patch: "text diff".to_string(),
+                    });
                 };
                 let left_txt = left_txt.as_str();
                 // context.set_result(text_diff.clone()).exit();
                 match DMP.patch_from_text::<Efficient>(text_diff) {
                     Ok(patches) => {
-                        let (new_txt, ops) = DMP.patch_apply(&patches, left_txt).unwrap();
+                        let (new_txt, ops) = DMP.patch_apply(&patches, left_txt)?;
                         ops.iter().for_each(|op| {
                             println!("{}", if *op { "OK" } else { "FAIL" });
                         });
@@ -79,19 +88,20 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
                         context.set_result(Value::String(new_txt)).exit();
                     }
                     Err(e) => {
-                        panic!("failed to apply text diff: {:#?}", e);
+                        return Err(JsonDiffPatchError::ApplyTextDiffFailed(e));
                     }
                 }
             }
             Delta::None => {}
         }
+        Ok(())
     }
 
     fn post_process(
         &self,
         context: &mut PatchContext<'a>,
         children_context: &mut Vec<(String, PatchContext<'a>)>,
-    ) {
+    ) -> Result<(), JsonDiffPatchError> {
         match &context.delta {
             Delta::Array(_changes) => {
                 // Collect results from children and apply them to the array
@@ -99,7 +109,9 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
                     .get_result_mut()
                     .expect("should be set during the main patch process")
                     .as_array_mut()
-                    .unwrap();
+                    .ok_or_else(|| JsonDiffPatchError::InvalidPatchToTarget {
+                        patch: "array".to_string(),
+                    })?;
 
                 for (index_str, child_context) in children_context {
                     if let Some(child_result) = child_context.get_result() {
@@ -114,7 +126,13 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
                 // context.set_result(Value::Array(array)).exit();
             }
             Delta::Object(_changes) => {
-                let mut new_object = context.left.as_object().unwrap().clone();
+                let mut new_object = context
+                    .left
+                    .as_object()
+                    .ok_or_else(|| JsonDiffPatchError::InvalidPatchToTarget {
+                        patch: "object".to_string(),
+                    })?
+                    .clone();
 
                 // Collect results from children and apply them to the object
                 for (key, child_context) in children_context {
@@ -129,16 +147,16 @@ impl<'a> Filter<PatchContext<'a>, Value> for PatchPipeline {
             }
             _ => {}
         }
+        Ok(())
     }
 }
 
-fn handle_array<'a>(
-    left: &'a Value,
+pub(crate) fn handle_array<'a>(
+    left: &'a [Value],
     array_delta: &Vec<(ArrayDeltaIndex, Delta<'a>)>,
     return_container: &mut Vec<(String, &'a Value, Delta<'a>)>,
-) -> Value {
-    let ori_array = left.as_array().unwrap();
-    let mut new_array = ori_array.clone();
+) -> Result<Value, JsonDiffPatchError> {
+    let mut new_array = left.to_vec();
 
     let mut to_insert: Vec<(usize, Value)> = Vec::new();
 
@@ -156,7 +174,10 @@ fn handle_array<'a>(
             ArrayDeltaIndex::RemovedOrMoved(removed_index) => {
                 // Check if it's a removal or move
                 if *removed_index >= new_array.len() {
-                    panic!("index out of bounds: the patch is trying to remove an item at index {}, but the array has only {} items", removed_index, new_array.len());
+                    return Err(JsonDiffPatchError::IndexOutOfBoundsRemove {
+                        index: *removed_index,
+                        length: new_array.len(),
+                    });
                 }
 
                 // Check if this was a move operation
@@ -170,7 +191,10 @@ fn handle_array<'a>(
                         to_insert.push((*new_index, removed_value));
                     }
                     _ => {
-                        panic!("only removal or move can be applied at original array indices");
+                        return Err(JsonDiffPatchError::InvalidPatch(
+                            "only removal or move can be applied at original array indices"
+                                .to_string(),
+                        ));
                     }
                 }
             }
@@ -181,11 +205,14 @@ fn handle_array<'a>(
                     }
                     Delta::Modified(_from, _to) => {
                         // Modified item - will be handled by child contexts
-                        let value = &ori_array[*new_index];
+                        let value = &left[*new_index];
                         return_container.push((new_index.to_string(), value, (*delta).clone()));
                     }
                     _ => {
-                        panic!("only addition or modification can be applied at new array indices");
+                        return Err(JsonDiffPatchError::InvalidPatch(
+                            "only addition or modification can be applied at new array indices"
+                                .to_string(),
+                        ));
                     }
                 }
             }
@@ -196,10 +223,13 @@ fn handle_array<'a>(
     to_insert.sort_by_key(|(index, _)| *index);
     for (index, value) in to_insert {
         if index > new_array.len() {
-            panic!("index out of bounds: the patch is trying to insert an item at index {}, but the array has only {} items", index, new_array.len());
+            return Err(JsonDiffPatchError::IndexOutOfBoundsInsert {
+                index,
+                length: new_array.len(),
+            });
         }
         new_array.insert(index, value);
     }
 
-    Value::Array(new_array)
+    Ok(Value::Array(new_array))
 }

@@ -2,6 +2,7 @@ pub mod clone;
 pub mod context;
 pub mod date_reviver;
 pub mod diffpatcher;
+pub mod errors;
 pub mod filters;
 pub mod lcs;
 pub mod processor;

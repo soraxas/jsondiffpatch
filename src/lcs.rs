@@ -31,10 +31,9 @@ pub fn longest_common_subsequence(
     first_seq: &Vec<Value>,
     second_seq: &Vec<Value>,
 ) -> Vec<(usize, usize)> {
-    let lcs_lengths = initialize_lcs_lengths(&first_seq, &second_seq);
-    let lcs_chars = reconstruct_lcs(&first_seq, &second_seq, &lcs_lengths);
+    let lcs_lengths = initialize_lcs_lengths(first_seq, second_seq);
 
-    lcs_chars
+    reconstruct_lcs(first_seq, second_seq, &lcs_lengths)
 }
 
 fn initialize_lcs_lengths(first_seq: &[Value], second_seq: &[Value]) -> Vec<Vec<usize>> {

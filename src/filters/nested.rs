@@ -1,4 +1,5 @@
-use crate::context::{DiffContext, FilterContext, PatchContext};
+use crate::context::{DiffContext, FilterContext};
+use crate::errors::JsonDiffPatchError;
 use crate::processor::Filter;
 use crate::types::Delta;
 use serde_json::Value;
@@ -21,7 +22,7 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for CollectionChildrenDiffFilter {
         &self,
         context: &mut DiffContext<'a>,
         children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
+    ) -> Result<(), JsonDiffPatchError> {
         let result: Delta<'a> = if context.left.is_object() {
             let mut result = HashMap::new();
 
@@ -31,11 +32,11 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for CollectionChildrenDiffFilter {
                 }
             }
             if result.is_empty() {
-                return;
+                return Ok(());
             }
             Delta::Object(result)
         } else if context.left.is_array() {
-            return;
+            return Ok(());
 
             let result = Vec::new();
 
@@ -46,14 +47,15 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for CollectionChildrenDiffFilter {
                 }
             }
             if result.is_empty() {
-                return;
+                return Ok(());
             }
             Delta::Array(result)
         } else {
-            return;
+            return Ok(());
         };
 
         context.set_result(result).exit();
+        Ok(())
     }
 }
 
@@ -66,10 +68,10 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ObjectsDiffFilter {
         &self,
         context: &mut DiffContext<'a>,
         new_children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
+    ) -> Result<(), JsonDiffPatchError> {
         // let mut context_mut = context.borrow_mut();
         if !context.left.is_object() {
-            return;
+            return Ok(());
         }
 
         let left = context.left.as_object().unwrap();
@@ -99,22 +101,10 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for ObjectsDiffFilter {
 
         if new_children_context.is_empty() {
             context.set_result(Delta::None).exit();
-            return;
+            return Ok(());
         }
 
         context.exit();
-    }
-}
-
-impl<'a> Filter<PatchContext<'a>, Value> for ObjectsPatchFilter {
-    fn filter_name(&self) -> &str {
-        "objects-patch"
-    }
-
-    fn process(
-        &self,
-        context: &mut PatchContext<'a>,
-        new_children_context: &mut Vec<(String, PatchContext<'a>)>,
-    ) {
+        Ok(())
     }
 }

@@ -1,4 +1,5 @@
 use crate::context::{DiffContext, FilterContext};
+use crate::errors::JsonDiffPatchError;
 use crate::processor::Filter;
 use crate::types::Delta;
 use diff_match_patch_rs::{DiffMatchPatch, Efficient, PatchInput};
@@ -65,10 +66,10 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TextsDiffFilter {
         &self,
         context: &mut DiffContext<'a>,
         _new_children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
+    ) -> Result<(), JsonDiffPatchError> {
         // Check if both values are strings
         if !context.left.is_string() || !context.right.is_string() {
-            return;
+            return Ok(());
         }
 
         let left = context.left.as_str().unwrap();
@@ -87,7 +88,7 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TextsDiffFilter {
             context
                 .set_result(Delta::Modified(context.left, context.right))
                 .exit();
-            return;
+            return Ok(());
         }
 
         // Try to use text-diff algorithm
@@ -100,63 +101,6 @@ impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TextsDiffFilter {
         let patch_txt = dmp.patch_to_text(&patches);
 
         context.set_result(Delta::TextDiff(patch_txt)).exit();
-    }
-
-    fn post_process(
-        &self,
-        _context: &mut DiffContext<'a>,
-        _children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
-        // No post-processing needed for text diff
-    }
-}
-
-pub struct TextsPatchFilter;
-
-impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TextsPatchFilter {
-    fn filter_name(&self) -> &str {
-        "texts-patch"
-    }
-
-    fn process(
-        &self,
-        context: &mut DiffContext<'a>,
-        _new_children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
-        // This filter is for patching, not diffing
-        // The actual patch logic would be in a separate PatchContext
-    }
-
-    fn post_process(
-        &self,
-        _context: &mut DiffContext<'a>,
-        _children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
-        // No post-processing needed
-    }
-}
-
-pub struct TextsReverseFilter;
-
-impl<'a> Filter<DiffContext<'a>, Delta<'a>> for TextsReverseFilter {
-    fn filter_name(&self) -> &str {
-        "texts-reverse"
-    }
-
-    fn process(
-        &self,
-        context: &mut DiffContext<'a>,
-        _new_children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
-        // This filter is for reversing, not diffing
-        // The actual reverse logic would be in a separate ReverseContext
-    }
-
-    fn post_process(
-        &self,
-        _context: &mut DiffContext<'a>,
-        _children_context: &mut Vec<(String, DiffContext<'a>)>,
-    ) {
-        // No post-processing needed
+        Ok(())
     }
 }

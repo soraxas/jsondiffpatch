@@ -1,6 +1,5 @@
 use crate::context::{ContextData, FilterContext};
 use crate::types::{Delta, Options};
-use serde_json::Value;
 use std::rc::Rc;
 
 #[derive(Debug)]
