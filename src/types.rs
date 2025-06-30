@@ -70,19 +70,6 @@ pub enum ArrayDeltaIndex {
     RemovedOrMoved(usize), // index are the old index
 }
 
-impl ArrayDeltaIndex {
-    pub fn to_serializable(&self) -> String {
-        match self {
-            ArrayDeltaIndex::NewOrModified(index) => {
-                format!("{}", index)
-            }
-            ArrayDeltaIndex::RemovedOrMoved(index) => {
-                format!("_{}", index)
-            }
-        }
-    }
-}
-
 impl Serialize for ArrayDeltaIndex {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -144,52 +131,6 @@ pub enum Delta<'a> {
 }
 
 impl<'a> Delta<'a> {
-    pub fn to_serializable(self) -> Value {
-        match self {
-            Delta::Added(new_value) => Value::Array(vec![new_value.clone()]),
-            Delta::Modified(old_value, new_value) => {
-                Value::Array(vec![old_value.clone(), new_value.clone()])
-            }
-            Delta::Deleted(deleted) => Value::Array(vec![
-                deleted.clone(),
-                MIDDLE_NO_VALUE,
-                MagicNumber::Deleted.into(),
-            ]),
-            Delta::Object(value) => Value::Object(
-                value
-                    .into_iter()
-                    .map(|(k, v)| (k, v.to_serializable()))
-                    .collect(),
-            ),
-            Delta::Array(array_changes) => {
-                let mut changes = ::serde_json::Map::new();
-                // marker
-                changes.insert("_t".to_string(), Value::String("a".to_string()));
-                for (index, delta) in array_changes {
-                    changes.insert(index.to_serializable(), delta.to_serializable());
-                }
-                Value::Object(changes)
-            }
-            Delta::Moved {
-                moved_value,
-                new_index,
-            } => Value::Array(vec![
-                moved_value.unwrap_or(&Value::Null).clone(),
-                new_index.into(),
-                MagicNumber::ArrayMoved.into(),
-            ]),
-            Delta::TextDiff(uni_diff) => Value::Array(vec![
-                uni_diff.into(),
-                MIDDLE_NO_VALUE,
-                MagicNumber::UndefinedDiff.into(),
-            ]),
-            Delta::None => {
-                panic!("Delta::None is not serializable");
-                // Value::Null
-            }
-        }
-    }
-
     /// Reverses the delta
     pub fn build_reverse(self) -> Result<Delta<'a>, JsonDiffPatchReverseError> {
         match self {
@@ -278,7 +219,6 @@ impl Serialize for Delta<'_> {
             }
             Delta::None => {
                 panic!("Delta::None is not serializable");
-                // Value::Null
             }
         }
     }
@@ -370,29 +310,32 @@ fn test_my_delta_to_serializable() {
         ),
     ]));
 
+    let delta_serialized = serde_json::to_string(&delta).unwrap();
+
     assert_eq!(
-        delta.to_serializable().to_string(),
-        r#"{
+        serde_json::from_str::<Value>(&delta_serialized).unwrap(),
+        serde_json::from_str::<Value>(
+            r#"{
             "a":["added"],
             "b":["old","new"],
-            "c":["deleted",0,0],
+            "c":["deleted",null,0],
             "d":["moved",1,3],
-            "e":["text_diff",0,2],
+            "e":["text_diff",null,2],
             "f":{
                 "5":["added"],
-                "_7":["deleted",0,0],
+                "_7":["deleted",null,0],
                 "_8":["moved",1,3],
                 "_t":"a"
             },
             "g":{
                 "h":["added"],
                 "i":["old","new"],
-                "j":["deleted",0,0],
+                "j":["deleted",null,0],
                 "k":["moved",1,3],
-                "l":["text_diff",0,2]
+                "l":["text_diff",null,2]
             }
         }"#
-        .replace("\n", "")
-        .replace(" ", ""),
+        )
+        .unwrap(),
     );
 }
