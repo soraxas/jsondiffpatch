@@ -33,6 +33,10 @@ where
         self
     }
 
+    fn pop_result(&mut self) -> Option<Self::Result> {
+        self.inner_data_mut().result.take()
+    }
+
     fn get_result(&self) -> Option<&Self::Result> {
         self.inner_data().result.as_ref()
     }

@@ -26,7 +26,7 @@ pub fn process_text_diff<'a>(
     // If strings are too short, use regular string replace
     if left.len() < min_length || right.len() < min_length {
         context
-            .set_result(Delta::Modified(context.left, context.right))
+            .set_result(Delta::modified_ref(context.left, context.right))
             .exit();
         return Ok(());
     }

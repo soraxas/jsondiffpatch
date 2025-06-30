@@ -1,3 +1,4 @@
+use crate::context::patch::DeltaIndicator;
 use crate::context::{FilterContext, PatchContext};
 use crate::errors::JsonDiffPatchError;
 use crate::pipeline::texts::DMP;
@@ -5,6 +6,7 @@ use crate::processor::Pipeline;
 use crate::types::{ArrayDeltaIndex, Delta};
 use diff_match_patch_rs::Efficient;
 use serde_json::{Map, Value};
+use std::borrow::Cow;
 
 pub struct ReversePipeline;
 
@@ -18,8 +20,8 @@ impl<'a> Pipeline<PatchContext<'a>, Value> for ReversePipeline {
         context: &mut PatchContext<'a>,
         new_children_context: &mut Vec<(String, PatchContext<'a>)>,
     ) -> Result<(), JsonDiffPatchError> {
-        match &context.delta {
-            Delta::Object(object_delta) => {
+        match context.take_delta() {
+            Delta::Object(_object_delta) => {
                 todo!()
             }
             Delta::Array(array_delta) => {
@@ -30,7 +32,7 @@ impl<'a> Pipeline<PatchContext<'a>, Value> for ReversePipeline {
                             patch: "array".to_string(),
                         }
                     })?,
-                    array_delta,
+                    &array_delta,
                     &mut container,
                 )?;
                 // handle new children
@@ -39,16 +41,16 @@ impl<'a> Pipeline<PatchContext<'a>, Value> for ReversePipeline {
                     new_children_context.push((name, child_context));
                 }
 
-                context.set_result(result).exit();
+                context.set_result(Cow::Owned(result)).exit();
             }
             Delta::Added(new_value) => {
-                context.set_result((*new_value).clone());
+                context.set_result(new_value);
             }
             Delta::Deleted(_old_value) => {
                 // dont apply this value to the result to keep it as deleted
             }
             Delta::Modified(_from, to) => {
-                context.set_result((*to).clone());
+                context.set_result(to);
             }
             Delta::Moved {
                 new_index: _,
@@ -66,7 +68,7 @@ impl<'a> Pipeline<PatchContext<'a>, Value> for ReversePipeline {
                 };
                 let left_txt = left_txt.as_str();
                 // context.set_result(text_diff.clone()).exit();
-                match DMP.patch_from_text::<Efficient>(text_diff) {
+                match DMP.patch_from_text::<Efficient>(text_diff.as_str()) {
                     Ok(patches) => {
                         let (new_txt, ops) = DMP.patch_apply(&patches, left_txt)?;
                         ops.iter().for_each(|op| {
@@ -75,7 +77,9 @@ impl<'a> Pipeline<PatchContext<'a>, Value> for ReversePipeline {
                             }
                         });
 
-                        context.set_result(Value::String(new_txt)).exit();
+                        context
+                            .set_result(Cow::Owned(Value::String(new_txt)))
+                            .exit();
                     }
                     Err(e) => {
                         return Err(JsonDiffPatchError::ApplyTextDiffFailed(e));
@@ -92,22 +96,24 @@ impl<'a> Pipeline<PatchContext<'a>, Value> for ReversePipeline {
         context: &mut PatchContext<'a>,
         children_context: &mut Vec<(String, PatchContext<'a>)>,
     ) -> Result<(), JsonDiffPatchError> {
-        match &context.delta {
-            Delta::Array(_changes) => {
+        match context.peek_delta() {
+            DeltaIndicator::Array => {
                 // Collect results from children and apply them to the array
-                let array_mut = context
+
+                let current_result = context
                     .get_result_mut()
-                    .expect("should be set during the main patch process")
-                    .as_array_mut()
-                    .ok_or_else(|| JsonDiffPatchError::InvalidPatchToTarget {
+                    .expect("should be set during the main patch process");
+                let array_mut = current_result.to_mut().as_array_mut().ok_or_else(|| {
+                    JsonDiffPatchError::InvalidPatchToTarget {
                         patch: "array".to_string(),
-                    })?;
+                    }
+                })?;
 
                 for (index_str, child_context) in children_context {
-                    if let Some(child_result) = child_context.get_result() {
+                    if let Some(child_result) = child_context.pop_result() {
                         if let Ok(index) = index_str.parse::<usize>() {
                             if index < array_mut.len() {
-                                array_mut[index] = child_result.clone();
+                                array_mut[index] = child_result.into_owned();
                             }
                         }
                     }
@@ -115,21 +121,22 @@ impl<'a> Pipeline<PatchContext<'a>, Value> for ReversePipeline {
                 // array is modified in-place.
                 // context.set_result(Value::Array(array)).exit();
             }
-            Delta::Object(_changes) => {
+            DeltaIndicator::Object => {
                 let mut reversed_changes = Map::new();
 
                 // Collect results from children and apply them to the object
                 for (key, child_context) in children_context
-                    .iter()
-                    .filter_map(|(key, context)| context.get_result().map(|result| (key, result)))
+                    .iter_mut()
+                    .filter_map(|(key, context)| context.pop_result().map(|result| (key, result)))
                 {
-                    reversed_changes.insert(key.clone(), child_context.clone());
+                    reversed_changes.insert(key.clone(), child_context.into_owned());
                 }
-
-                context.set_result(Value::Object(reversed_changes)).exit();
+                context
+                    .set_result(Cow::Owned(Value::Object(reversed_changes)))
+                    .exit();
             }
             _ => {}
-        }
+        };
         Ok(())
     }
 }
@@ -184,7 +191,7 @@ pub(crate) fn handle_array<'a>(
             ArrayDeltaIndex::NewOrModified(new_index) => {
                 match delta {
                     Delta::Added(value) => {
-                        to_insert.push((*new_index, (*value).clone()));
+                        to_insert.push((*new_index, (*value.as_ref()).clone()));
                     }
                     Delta::Modified(_from, _to) => {
                         // Modified item - will be handled by child contexts

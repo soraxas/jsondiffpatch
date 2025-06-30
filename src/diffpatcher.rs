@@ -37,7 +37,7 @@ impl DiffPatcher {
             .process(&mut context, &mut patch_pipe)
             .expect("patch failed");
 
-        context.get_result().cloned()
+        context.pop_result().map(|r| r.into_owned())
     }
 
     pub fn reverse(&self, _delta: &Delta) -> Option<Delta> {

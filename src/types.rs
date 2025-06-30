@@ -3,6 +3,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -117,13 +118,13 @@ impl Ord for ArrayDeltaIndex {
 
 #[derive(Debug, Clone)]
 pub enum Delta<'a> {
-    Added(&'a Value),
-    Modified(&'a Value, &'a Value),
-    Deleted(&'a Value),
+    Added(Cow<'a, Value>),
+    Modified(Cow<'a, Value>, Cow<'a, Value>),
+    Deleted(Cow<'a, Value>),
     Object(HashMap<String, Delta<'a>>),
     Array(Vec<(ArrayDeltaIndex, Delta<'a>)>),
     Moved {
-        moved_value: Option<&'a Value>,
+        moved_value: Option<Cow<'a, Value>>,
         new_index: usize,
     },
     TextDiff(String),
@@ -131,6 +132,33 @@ pub enum Delta<'a> {
 }
 
 impl<'a> Delta<'a> {
+    pub fn added_ref(value: &'a Value) -> Delta<'a> {
+        Delta::Added(Cow::Borrowed(value))
+    }
+
+    pub fn modified_ref(old_value: &'a Value, new_value: &'a Value) -> Delta<'a> {
+        Delta::Modified(Cow::Borrowed(old_value), Cow::Borrowed(new_value))
+    }
+
+    pub fn deleted_ref(value: &'a Value) -> Delta<'a> {
+        Delta::Deleted(Cow::Borrowed(value))
+    }
+
+    pub fn moved_ref(moved_value: &'a Value, new_index: usize) -> Delta<'a> {
+        Delta::Moved {
+            moved_value: Some(Cow::Borrowed(moved_value)),
+            new_index,
+        }
+    }
+
+    pub fn text_diff_ref(text_diff: &'a str) -> Delta<'a> {
+        Delta::TextDiff(text_diff.to_string())
+    }
+
+    // pub fn array(array: Vec<(ArrayDeltaIndex, Delta<'a>)>) -> Delta<'a> {
+    //     Delta::Array(array)
+    // }
+
     /// Reverses the delta
     pub fn build_reverse(self) -> Result<Delta<'a>, JsonDiffPatchReverseError> {
         match self {
@@ -205,7 +233,9 @@ impl Serialize for Delta<'_> {
                 new_index,
             } => {
                 let mut seq = serializer.serialize_seq(Some(3))?;
-                seq.serialize_element(moved_value.unwrap_or(&Value::Null))?;
+                seq.serialize_element(
+                    moved_value.as_ref().unwrap_or(&Cow::Borrowed(&Value::Null)),
+                )?;
                 seq.serialize_element(new_index)?;
                 seq.serialize_element(&MagicNumber::ArrayMoved)?;
                 seq.end()
@@ -256,21 +286,21 @@ impl Default for Options {
 
 #[test]
 fn test_my_delta_to_serializable() {
-    let added = "added".into();
-    let old = "old".into();
-    let new = "new".into();
-    let deleted = "deleted".into();
-    let moved = "moved".into();
-    let text_diff = "text_diff";
+    let added: Value = "added".into();
+    let old: Value = "old".into();
+    let new: Value = "new".into();
+    let deleted: Value = "deleted".into();
+    let moved: Value = "moved".into();
+    let text_diff: Value = "text_diff".into();
 
     let delta = Delta::Object(HashMap::from([
-        ("a".to_string(), (Delta::Added(&added))),
-        ("b".to_string(), (Delta::Modified(&old, &new))),
-        ("c".to_string(), (Delta::Deleted(&deleted))),
+        ("a".to_string(), (Delta::added_ref(&added))),
+        ("b".to_string(), (Delta::modified_ref(&old, &new))),
+        ("c".to_string(), (Delta::deleted_ref(&deleted))),
         (
             "d".to_string(),
             (Delta::Moved {
-                moved_value: Some(&moved),
+                moved_value: Some(Cow::Borrowed(&moved)),
                 new_index: 1,
             }),
         ),
@@ -278,15 +308,18 @@ fn test_my_delta_to_serializable() {
         (
             "f".to_string(),
             (Delta::Array(vec![
-                (ArrayDeltaIndex::NewOrModified(5), (Delta::Added(&added))),
+                (
+                    ArrayDeltaIndex::NewOrModified(5),
+                    (Delta::added_ref(&added)),
+                ),
                 (
                     ArrayDeltaIndex::RemovedOrMoved(7),
-                    (Delta::Deleted(&deleted)),
+                    (Delta::deleted_ref(&deleted)),
                 ),
                 (
                     ArrayDeltaIndex::RemovedOrMoved(8),
                     (Delta::Moved {
-                        moved_value: Some(&moved),
+                        moved_value: Some(Cow::Borrowed(&moved)),
                         new_index: 1,
                     }),
                 ),
@@ -295,13 +328,13 @@ fn test_my_delta_to_serializable() {
         (
             "g".to_string(),
             (Delta::Object(HashMap::from([
-                ("h".to_string(), (Delta::Added(&added))),
-                ("i".to_string(), (Delta::Modified(&old, &new))),
-                ("j".to_string(), (Delta::Deleted(&deleted))),
+                ("h".to_string(), (Delta::added_ref(&added))),
+                ("i".to_string(), (Delta::modified_ref(&old, &new))),
+                ("j".to_string(), (Delta::deleted_ref(&deleted))),
                 (
                     "k".to_string(),
                     (Delta::Moved {
-                        moved_value: Some(&moved),
+                        moved_value: Some(Cow::Borrowed(&moved)),
                         new_index: 1,
                     }),
                 ),

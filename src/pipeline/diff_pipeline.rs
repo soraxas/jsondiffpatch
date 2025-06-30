@@ -24,14 +24,14 @@ impl<'a> Pipeline<DiffContext<'a>, Delta<'a>> for DiffPipeline {
             context.set_result(Delta::None).exit();
         } else if context.right.is_null() {
             // new added value
-            context.set_result(Delta::Deleted(context.left)).exit();
+            context.set_result(Delta::deleted_ref(context.left)).exit();
         } else if context.left.is_boolean()
             || context.left.is_number()
             || (std::mem::discriminant(context.left) != std::mem::discriminant(context.right))
         {
             // trivial value / different types
             context
-                .set_result(Delta::Modified(context.left, context.right))
+                .set_result(Delta::modified_ref(context.left, context.right))
                 .exit();
         } else {
             // now left's type must equals to right's type
@@ -73,7 +73,7 @@ impl<'a> Pipeline<DiffContext<'a>, Delta<'a>> for DiffPipeline {
                     )?;
                 }
                 Value::Null => {
-                    context.set_result(Delta::Added(context.right)).exit();
+                    context.set_result(Delta::added_ref(context.right)).exit();
                 }
                 Value::String(string) => {
                     process_text_diff(
@@ -99,8 +99,8 @@ impl<'a> Pipeline<DiffContext<'a>, Delta<'a>> for DiffPipeline {
                 let mut result = HashMap::new();
 
                 for (key, child) in children_context {
-                    if let Some(child_result) = child.get_result() {
-                        result.insert(key.clone(), child_result.clone());
+                    if let Some(child_result) = child.pop_result() {
+                        result.insert(key.clone(), child_result);
                     }
                 }
                 if result.is_empty() {

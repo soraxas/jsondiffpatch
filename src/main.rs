@@ -88,8 +88,8 @@ fn main() {
     let b = json!("b");
     // let c = json!("c");
     let delta = Delta::Array(vec![
-        (ArrayDeltaIndex::NewOrModified(0), Delta::Added(&a)),
-        (ArrayDeltaIndex::RemovedOrMoved(1), Delta::Deleted(&b)),
+        (ArrayDeltaIndex::NewOrModified(0), Delta::added_ref(&a)),
+        (ArrayDeltaIndex::RemovedOrMoved(1), Delta::deleted_ref(&b)),
         (
             ArrayDeltaIndex::RemovedOrMoved(0),
             Delta::Moved {
