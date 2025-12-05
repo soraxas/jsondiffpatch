@@ -291,7 +291,7 @@ fn test_my_delta_to_serializable() {
     let new: Value = "new".into();
     let deleted: Value = "deleted".into();
     let moved: Value = "moved".into();
-    let text_diff: Value = "text_diff".into();
+    let text_diff = "text_diff";
 
     let delta = Delta::Object(HashMap::from([
         ("a".to_string(), (Delta::added_ref(&added))),
