@@ -177,10 +177,10 @@ impl<'a> Delta<'a> {
                 moved_value: _,
                 new_index: _,
             } => Err(JsonDiffPatchReverseError::InvalidMoveDelta),
-            Delta::TextDiff(uni_diff) => {
+            Delta::TextDiff(_uni_diff) => {
                 todo!()
             }
-            Delta::Array(array) => {
+            Delta::Array(_array) => {
                 todo!()
             }
         }

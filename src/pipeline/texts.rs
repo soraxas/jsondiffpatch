@@ -35,7 +35,7 @@ pub fn process_text_diff<'a>(
     let diffs = DMP.diff_main::<Efficient>(left, right)?;
     // Now, we are going to create a list of `patches` to be applied to the old text to get the new text
     let patches = DMP.patch_make(PatchInput::new_diffs(&diffs))?;
-    // in the real world you are going to transmit or store this diff serialized to undiff format to be consumed or used somewhere elese
+    // in the real world you are going to transmit or store this diff serialized to undiff format to be consumed or used somewhere else
     let patch_txt = DMP.patch_to_text(&patches);
 
     context.set_result(Delta::TextDiff(patch_txt)).exit();

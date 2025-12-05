@@ -40,7 +40,7 @@ impl DiffPatcher {
         context.pop_result().map(|r| r.into_owned())
     }
 
-    pub fn reverse(&self, _delta: &Delta) -> Option<Delta> {
+    pub fn reverse(&self, _delta: &Delta) -> Option<Delta<'_>> {
         // Create a reverse context
         // For now, return None as the implementation is simplified
         None
